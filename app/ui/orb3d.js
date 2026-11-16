@@ -5,6 +5,17 @@ import {EffectComposer} from "./vendor/postprocessing/EffectComposer.js";
 import {RenderPass} from "./vendor/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "./vendor/postprocessing/UnrealBloomPass.js";
 import {OutputPass} from "./vendor/postprocessing/OutputPass.js";
+import {ShaderPass} from "./vendor/postprocessing/ShaderPass.js";
+import {AfterimagePass} from "./vendor/postprocessing/AfterimagePass.js";
+
+// radial colour fringing, strongest at the edges and during a shockwave
+const FRINGE = {
+  uniforms: {tDiffuse: {value: null}, uAmt: {value: 0.001}},
+  vertexShader: "varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uAmt; varying vec2 vUv;
+    void main(){ vec2 c=vUv-0.5; float d=dot(c,c); vec2 o=c*d*uAmt*6.0+c*uAmt;
+      gl_FragColor=vec4(texture2D(tDiffuse,vUv+o).r,texture2D(tDiffuse,vUv).g,texture2D(tDiffuse,vUv-o).b,1.0); }`,
+};
 
 const NOISE = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -62,7 +73,7 @@ void main(){
   vS=s*act+w*0.9+uThink*0.3;
   vR=aRand;
   vDepth=clamp(1.0-(-mv.z-3.2)/3.0,0.18,1.0)*(1.0-0.5*uThink);
-  gl_PointSize=uSize*uPixel*(1.4+2.8*aRand*aRand+2.0*vS)*(4.2/(-mv.z));
+  gl_PointSize=uSize*uPixel*(1.4+2.8*aRand*aRand+0.9*vS)*(4.2/(-mv.z));
 }`;
 const SPHERE_FRAG = `
 uniform vec3 uColor,uHot;
@@ -71,7 +82,7 @@ void main(){
   float d=length(gl_PointCoord-0.5); if(d>0.5) discard;
   float a=pow(1.0-d*2.0,1.5);
   vec3 col=mix(uColor,uHot,clamp(vS*1.4+vR*0.12,0.0,1.0));
-  gl_FragColor=vec4(col*a*(0.9+1.5*vDepth),a);
+  gl_FragColor=vec4(col*a*(0.55+0.95*vDepth)*(1.0-0.35*clamp(vS,0.0,1.0)),a);
 }`;
 
 const RING_VERT = `
@@ -188,8 +199,12 @@ function init() {
   // bloom
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
+  const trails = new AfterimagePass(0.8);      // faint motion trails
+  composer.addPass(trails);
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.75, 0.35, 0.22);
   composer.addPass(bloom);
+  const fringe = new ShaderPass(FRINGE);
+  composer.addPass(fringe);
   composer.addPass(new OutputPass());
 
   function resize() {
@@ -238,10 +253,13 @@ function init() {
       sphere.rotation.set(rotX, rotY, 0);
       rings.forEach((r) => { r.rotation.set(r.userData.tiltX + Math.sin(p.t * 0.3) * 0.08, 0, r.userData.tiltZ); });
       camera.position.x += ((px * 0.5) - camera.position.x) * k(2); camera.position.y += ((-py * 0.35) - camera.position.y) * k(2);
-      camera.position.z += ((4.2 - speak * 0.25 - think * 0.15) - camera.position.z) * k(2);
+      camera.position.z += ((4.2 + (1 - Math.min(1, p.boot)) * 2.4 - speak * 0.25 - think * 0.15) - camera.position.z) * k(2);
       camera.lookAt(0, 0, 0);
       stars.rotation.y = p.t * 0.01;
-      bloom.strength = 0.5 + p.energy * 0.7 + think * 0.15;
+      const wave = pulse < 1.4 ? Math.max(0, 1 - Math.abs(pulse - 0.45) * 1.6) : 0;
+      fringe.uniforms.uAmt.value = 0.0008 + wave * 0.006 + think * 0.0015;
+      trails.uniforms.damp.value = think > 0.5 ? 0.8 : 0.62;
+      bloom.strength = 0.45 + p.energy * 0.35 + think * 0.1;
       composer.render();
     },
   };

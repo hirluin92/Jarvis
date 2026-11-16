@@ -309,3 +309,6 @@ anelli orbitanti, nucleo luminoso, bloom, onda d'urto a ogni frase, vortice a sp
 trascinamento col dito/mouse per ruotarlo; effetto "glitch" sul cambio di stato. Se il browser non
 supporta WebGL resta l'orb 2D (anche `?lite` per forzarlo). Provato in Chrome con rendering software;
 le prestazioni su telefono vere vanno viste dal vivo.
+Quarta rifinitura (17 nov): scie di movimento (AfterimagePass), aberrazione cromatica sulle onde d'urto,
+sequenza di avvio a ogni collegamento (voci di avvio mostrate solo a sessione già stabilita),
+riflesso orizzontale sul nucleo quando qualcuno parla, luminosità ridotta per non saturare.
