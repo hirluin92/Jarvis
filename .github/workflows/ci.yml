@@ -23,6 +23,6 @@ jobs:
       - name: Evals (real model, capped spend)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # GitHub forbids secret names starting with GITHUB_, so the secret is GH_READ_TOKEN
-          GITHUB_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
+          # GitHub forbids secret names starting with GITHUB_, hence the GH_ prefix everywhere
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
         run: uv run python -m evals.run --max-cost 1.00

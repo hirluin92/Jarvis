@@ -2,7 +2,7 @@ from datetime import time
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     telegram_allowed_user_ids: Annotated[list[int], NoDecode] = []
     agent_max_iterations: int = 8
     tool_timeout_seconds: float = 30
-    github_read_token: str = ""
+    github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
     products_file: str = "config/products.yaml"
     report_time: time = time(7, 30)
     report_timezone: str = "Europe/Rome"

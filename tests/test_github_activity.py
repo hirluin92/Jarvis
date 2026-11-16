@@ -82,5 +82,5 @@ async def test_missing_token_is_a_tool_error(setup, monkeypatch):
     monkeypatch.setattr(
         github_activity, "get_settings", lambda: SimpleNamespace(github_read_token="")
     )
-    with pytest.raises(RuntimeError, match="GITHUB_READ_TOKEN"):
+    with pytest.raises(RuntimeError, match="GH_READ_TOKEN"):
         await github_activity.github_activity(GithubActivityInput())

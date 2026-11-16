@@ -81,7 +81,7 @@ async def _repo_activity(c: httpx.AsyncClient, repo: str, since: datetime) -> di
 async def github_activity(inp: GithubActivityInput) -> dict[str, Any]:
     token = get_settings().github_read_token
     if not token:
-        raise RuntimeError("GITHUB_READ_TOKEN is not configured")
+        raise RuntimeError("GH_READ_TOKEN is not configured")
     products = get_catalog().select(inp.product)
     since = datetime.now(UTC) - timedelta(hours=WINDOW_HOURS)
 
