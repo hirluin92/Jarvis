@@ -21,8 +21,10 @@ from app.agent.loop import (
     resume_confirmed,
     run_agent,
 )
+from app.conversations import ConversationStore
 from app.costs import estimate_cost, format_cost
 from app.feedback import mark_bad_and_draft
+from app.memory import MemoryStore, format_memory
 from app.report import generate_report
 from app.tracing import Tracer
 
@@ -37,11 +39,18 @@ class BotState:
     contexts: dict[int, AgentContext] = field(default_factory=dict)
     pending: dict[int, AgentResult] = field(default_factory=dict)
     last_run: dict[int, int] = field(default_factory=dict)
+    conversations: ConversationStore | None = None  # persistent history (Postgres)
+    memory: MemoryStore | None = None  # saved facts; also feeds the context of each run
 
-    def ctx(self, chat_id: int) -> AgentContext:
+    async def ctx(self, chat_id: int) -> AgentContext:
         if chat_id not in self.contexts:
             ctx = self.make_context()
             ctx.actor = f"telegram:{chat_id}"
+            if self.memory is not None:
+                ctx.system_extra = self.memory.context_for
+            if self.conversations is not None:
+                ctx.store, ctx.conversation_id = self.conversations, f"telegram:{chat_id}"
+                ctx.history, ctx.summary = await self.conversations.load(ctx.conversation_id)
             self.contexts[chat_id] = ctx
         return self.contexts[chat_id]
 
@@ -88,7 +97,40 @@ def build_handlers(state: BotState) -> list:
             cid = update.effective_chat.id
             state.contexts.pop(cid, None)
             state.pending.pop(cid, None)
+            if state.conversations is not None:
+                await state.conversations.delete(f"telegram:{cid}")
             await update.effective_message.reply_text("Cronologia svuotata.")
+
+    async def memory_list(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.memory is None:
+            return
+        facts = await state.memory.list_active()
+        text = "\n".join(format_memory(m) for m in facts) or "Nessun fatto salvato."
+        await update.effective_message.reply_text(text[:4000])
+
+    async def forget_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.memory is None:
+            return
+        args = getattr(context, "args", None) or []
+        if len(args) != 1 or not args[0].isdigit():
+            await update.effective_message.reply_text("Uso: /forget <id> (gli id sono in /memory)")
+            return
+        memory_id = int(args[0])
+        fact = await state.memory.get(memory_id)
+        # the user typed the command themselves: that is the explicit consent, no extra click
+        if fact is None or not await state.memory.forget(memory_id):
+            await update.effective_message.reply_text(f"Fatto #{memory_id} non trovato.")
+            return
+        await state.tracer.record_action(
+            f"telegram:{update.effective_chat.id}",
+            None,
+            "forget",
+            "command",
+            {"id": memory_id, "text": fact.text},
+            {"id": memory_id, "status": "forgotten"},
+            None,
+        )
+        await update.effective_message.reply_text(f"Dimenticato #{memory_id}: «{fact.text}»")
 
     async def last(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
@@ -141,7 +183,7 @@ def build_handlers(state: BotState) -> list:
         if not _allowed(state, update) or not update.effective_message.text:
             return
         cid = update.effective_chat.id
-        ctx = state.ctx(cid)
+        ctx = await state.ctx(cid)
         if old := state.pending.pop(cid, None):
             cancel_pending(ctx, old)  # keep history valid: unanswered confirm = cancelled
         typing = asyncio.create_task(_typing(update))
@@ -164,7 +206,7 @@ def build_handlers(state: BotState) -> list:
             await q.edit_message_text("Richiesta scaduta o già usata.")
             return
         state.pending.pop(cid)  # single use: a second click finds nothing
-        ctx = state.ctx(cid)
+        ctx = await state.ctx(cid)
         if pending.pending is not None and pending.pending.expired():
             cancel_pending(ctx, pending)
             await q.edit_message_text("Richiesta scaduta (oltre 10 minuti): azione non eseguita.")
@@ -183,6 +225,8 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("report", report),
         CommandHandler("bad", bad),
         CommandHandler("actions", actions),
+        CommandHandler("memory", memory_list),
+        CommandHandler("forget", forget_cmd),
         CallbackQueryHandler(on_button),
         MessageHandler(filters.TEXT & ~filters.COMMAND, on_text),
     ]

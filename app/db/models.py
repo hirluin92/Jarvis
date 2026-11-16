@@ -59,6 +59,30 @@ class Action(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class Memory(Base):
+    """A verified fact worth remembering across conversations (not a chat transcript)."""
+
+    __tablename__ = "memories"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    text: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(16), default="fact")
+    source_run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"))
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    superseded_by: Mapped[int | None] = mapped_column(Integer)
+
+
+class Conversation(Base):
+    """Persistent chat history, so a restart continues where the conversation was."""
+
+    __tablename__ = "conversations"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Step(Base):
     __tablename__ = "steps"
     id: Mapped[int] = mapped_column(primary_key=True)

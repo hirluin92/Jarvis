@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 from contextlib import asynccontextmanager
 from zoneinfo import ZoneInfo
 
@@ -8,9 +9,11 @@ from sqlalchemy import text
 from app.agent.llm import AnthropicClient
 from app.agent.loop import AgentContext
 from app.config import get_settings
+from app.conversations import ConversationStore
 from app.costs import estimate_cost
 from app.db import session as db
 from app.interfaces.telegram import BotState, build_application
+from app.memory import MemoryStore
 from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
@@ -57,6 +60,9 @@ async def lifespan(app: FastAPI):
     llm = AnthropicClient(s.anthropic_api_key, s.anthropic_model)
     registry = default_registry()
 
+    memory = MemoryStore(db.session_maker())
+    conversations = ConversationStore(db.session_maker())
+
     def make_context() -> AgentContext:
         return AgentContext(
             llm=llm,
@@ -64,11 +70,23 @@ async def lifespan(app: FastAPI):
             tracer=tracer,
             max_iterations=s.agent_max_iterations,
             tool_timeout=s.tool_timeout_seconds,
+            history_limit=60,  # hard cap; older turns are folded into a summary before this
+            summary_threshold=30,
+            keep_recent=12,
         )
 
     app.state.tracer = tracer
+    app.state.memory = memory
+    app.state.csrf_token = secrets.token_urlsafe(32)  # guards the web page's edit/forget forms
     bot = build_application(
-        s.telegram_bot_token, BotState(set(s.telegram_allowed_user_ids), make_context, tracer)
+        s.telegram_bot_token,
+        BotState(
+            set(s.telegram_allowed_user_ids),
+            make_context,
+            tracer,
+            conversations=conversations,
+            memory=memory,
+        ),
     )
     await bot.initialize()
     await bot.start()

@@ -120,17 +120,19 @@ async def test_merge_not_confirmed_by_the_readback_is_an_error(github):
         await merge_pull_request.merge_pull_request(MergeInput(product="App", pr_number=3))
 
 
-def test_confirmation_text_says_exactly_what_will_happen(github):
+async def test_confirmation_text_says_exactly_what_will_happen(github):
     reg = ToolRegistry()
     reg.register(merge_pull_request.TOOL)
-    text = reg.describe("merge_pull_request", {"product": "App", "pr_number": 3, "method": "merge"})
+    text = await reg.describe(
+        "merge_pull_request", {"product": "App", "pr_number": 3, "method": "merge"}
+    )
     assert text == "merge della pull request #3 nel repo me/app (metodo: merge)"
 
 
-def test_confirmation_text_falls_back_to_the_generic_form(github):
+async def test_confirmation_text_falls_back_to_the_generic_form(github):
     reg = ToolRegistry()
     reg.register(merge_pull_request.TOOL)
-    text = reg.describe("merge_pull_request", {"product": "Zeta", "pr_number": 3})
+    text = await reg.describe("merge_pull_request", {"product": "Zeta", "pr_number": 3})
     assert text == "merge_pull_request(product='Zeta', pr_number=3)"
 
 

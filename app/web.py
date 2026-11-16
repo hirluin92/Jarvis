@@ -1,8 +1,10 @@
 import json
+import secrets
 from html import escape
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.costs import estimate_cost, format_cost
 
@@ -43,6 +45,65 @@ def _dump(value: object) -> str:
     if len(text) > MAX_FIELD_CHARS:
         text = text[:MAX_FIELD_CHARS] + "\n… (troncato)"
     return escape(text)
+
+
+async def _form(request: Request) -> dict[str, str]:
+    """Parse an urlencoded form body and check its CSRF token (no multipart dependency needed)."""
+    data = {k: v[0] for k, v in parse_qs((await request.body()).decode()).items()}
+    if not secrets.compare_digest(data.get("token", ""), request.app.state.csrf_token):
+        raise HTTPException(403, "invalid token")
+    return data
+
+
+@router.get("/ui/memory", response_class=HTMLResponse)
+async def memory_page(request: Request) -> HTMLResponse:
+    token = request.app.state.csrf_token
+    facts = await request.app.state.memory.list_active()
+    rows = "".join(
+        f"<tr><td>{m.id}</td><td>{escape(m.category)}</td><td>"
+        f'<form method="post" action="/ui/memory/{m.id}/edit">'
+        f'<input type="hidden" name="token" value="{token}">'
+        f'<input name="text" value="{escape(m.text)}" size="60" maxlength="500">'
+        f"<button>Salva</button></form></td><td>"
+        f'<form method="post" action="/ui/memory/{m.id}/forget">'
+        f'<input type="hidden" name="token" value="{token}">'
+        f"<button>Dimentica</button></form></td></tr>"
+        for m in facts
+    )
+    empty = "" if facts else "<p class='mut'>Nessun fatto salvato.</p>"
+    body = (
+        "<h1>Memoria</h1><p class='mut'>Fatti attivi. Si possono correggere o dimenticare; "
+        "i segreti vengono rifiutati.</p>"
+        f"<div class='wrap'><table><tr><th>#</th><th>Categoria</th><th>Testo</th><th></th></tr>"
+        f"{rows}</table></div>{empty}"
+    )
+    return _page("Memoria", body)
+
+
+@router.post("/ui/memory/{memory_id}/edit")
+async def memory_edit(request: Request, memory_id: int) -> RedirectResponse:
+    form = await _form(request)
+    try:
+        done = await request.app.state.memory.update_text(memory_id, form.get("text", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    if not done:
+        raise HTTPException(404, "fact not found")
+    await request.app.state.tracer.record_action(
+        "web", None, "memory_edit", "command", {"id": memory_id}, {"text": form["text"]}, None
+    )
+    return RedirectResponse("/ui/memory", status_code=303)
+
+
+@router.post("/ui/memory/{memory_id}/forget")
+async def memory_forget(request: Request, memory_id: int) -> RedirectResponse:
+    await _form(request)
+    if not await request.app.state.memory.forget(memory_id):
+        raise HTTPException(404, "fact not found")
+    await request.app.state.tracer.record_action(
+        "web", None, "forget", "command", {"id": memory_id}, {"status": "forgotten"}, None
+    )
+    return RedirectResponse("/ui/memory", status_code=303)
 
 
 @router.get("/ui/runs", response_class=HTMLResponse)

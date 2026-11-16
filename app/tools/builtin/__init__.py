@@ -4,10 +4,13 @@ from app.tools.builtin import (
     create_note,
     draft_email,
     echo_confirm_demo,
+    forget,
     get_current_time,
     github_activity,
     http_health_check,
     merge_pull_request,
+    recall,
+    remember,
     send_email,
     site_status,
 )
@@ -28,6 +31,9 @@ def default_registry() -> ToolRegistry:
         merge_pull_request,
         draft_email,
         send_email,
+        remember,
+        recall,
+        forget,
     ):
         reg.register(mod.TOOL)
     return reg

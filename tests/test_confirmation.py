@@ -113,7 +113,7 @@ def _on_button(state):
 async def _state_with_pending(tracer, make_ctx, executed, age_seconds=0.0):
     ctx = make_ctx(_call_then("ok"), _registry("confirm", executed))
     state = BotState({1}, lambda: ctx, tracer)
-    result = await run_agent("vai", state.ctx(1))
+    result = await run_agent("vai", await state.ctx(1))
     result.pending.created_at -= age_seconds
     state.pending[1] = result
     return state, result

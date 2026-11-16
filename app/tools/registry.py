@@ -1,3 +1,4 @@
+import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -15,7 +16,7 @@ class Tool:
     permission: Permission
     func: Callable[[Any], Awaitable[Any]]
     # human-readable summary of what the call will do, shown in the confirmation message
-    describe: Callable[[Any], str] | None = None
+    describe: Callable[[Any], str | Awaitable[str]] | None = None
 
 
 class ToolInputError(Exception):
@@ -52,12 +53,16 @@ class ToolRegistry:
             msgs = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors())
             raise ToolInputError(f"Invalid input for {name}: {msgs}") from e
 
-    def describe(self, name: str, raw: dict[str, Any]) -> str:
-        """What a call will do, for the confirmation message; generic if the tool has no text."""
+    async def describe(self, name: str, raw: dict[str, Any]) -> str:
+        """What a call will do, for the confirmation message; generic if the tool has no text.
+
+        A tool's `describe` may be sync or async (it may need to read the database).
+        """
         tool = self._tools[name]
         if tool.describe is not None:
             try:
-                return tool.describe(self.validate(name, raw))
+                text = tool.describe(self.validate(name, raw))
+                return await text if inspect.isawaitable(text) else text
             except Exception:  # noqa: BLE001 - a broken summary must not block the confirmation
                 pass
         args = ", ".join(f"{k}={v!r}" for k, v in raw.items())

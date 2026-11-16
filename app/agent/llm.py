@@ -66,7 +66,9 @@ class FakeLLMClient:
     def __init__(self, responses: list[LLMResponse]) -> None:
         self._responses = list(responses)
         self.calls: list[list[dict[str, Any]]] = []
+        self.systems: list[str] = []
 
     async def complete(self, system, messages, tools) -> LLMResponse:
         self.calls.append(list(messages))
+        self.systems.append(system)
         return self._responses.pop(0)

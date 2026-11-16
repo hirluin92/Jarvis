@@ -81,10 +81,10 @@ def test_send_is_confirm_level_and_draft_is_write():
     assert draft_email.TOOL.permission == "write"
 
 
-def test_confirmation_shows_recipient_subject_and_full_text():
+async def test_confirmation_shows_recipient_subject_and_full_text():
     reg = ToolRegistry()
     reg.register(send_email.TOOL)
-    text = reg.describe(
+    text = await reg.describe(
         "send_email", {"to": "anna@example.com", "subject": "Ciao", "body": "Ci vediamo domani."}
     )
     assert text == "inviare un'email a anna@example.com\nOggetto: Ciao\n\nCi vediamo domani."
