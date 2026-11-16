@@ -15,9 +15,14 @@ from app.tools.builtin import default_registry
 from app.tracing import Tracer
 
 SCENARIOS = Path(__file__).parent / "scenarios"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
-async def run_scenario(sc: dict, tracer: Tracer, llm: AnthropicClient, s) -> dict:
+async def run_scenario(
+    sc: dict, tracer: Tracer, llm: AnthropicClient, s, default_catalog: str
+) -> dict:
+    # a scenario may point at a fixture catalog (e.g. one with a site that is down)
+    s.products_file = str(FIXTURES / sc["catalog"]) if "catalog" in sc else default_catalog
     ctx = AgentContext(
         llm=llm,
         registry=default_registry(),
@@ -45,6 +50,7 @@ async def run_scenario(sc: dict, tracer: Tracer, llm: AnthropicClient, s) -> dic
 
 async def main() -> int:
     s = get_settings()
+    default_catalog = s.products_file
     db_file = Path(tempfile.mkdtemp()) / "evals.db"  # isolated: evals never touch the real DB
     init_db(f"sqlite+aiosqlite:///{db_file}")
     from app.db.session import engine
@@ -54,7 +60,9 @@ async def main() -> int:
     tracer = Tracer(session_maker())
     llm = AnthropicClient(s.anthropic_api_key, s.anthropic_model)
     rows = [
-        await run_scenario(yaml.safe_load(p.read_text(encoding="utf-8")), tracer, llm, s)
+        await run_scenario(
+            yaml.safe_load(p.read_text(encoding="utf-8")), tracer, llm, s, default_catalog
+        )
         for p in sorted(SCENARIOS.glob("*.yaml"))
     ]
     print(f"{'scenario':<20}{'result':<8}{'tools':<30}{'secs':>6}{'tokens':>8}")

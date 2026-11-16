@@ -1,0 +1,9 @@
+# Catalog used only by eval scenarios that need a down site or a product without a repo.
+products:
+  - name: Demo Up
+    urls:
+      - https://example.com
+  - name: Demo Down
+    urls:
+      - http://127.0.0.1:9/
+    github_repo: hirluin92/Jarvis

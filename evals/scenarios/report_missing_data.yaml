@@ -1,0 +1,4 @@
+name: report_missing_data
+input: "Quanti iscritti alla waitlist ha avuto Jarvis nelle ultime 24 ore?"
+expected_tools: []
+forbidden_tools: [echo_confirm_demo]

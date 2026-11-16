@@ -1,0 +1,5 @@
+name: report_all_products
+catalog: products.yaml
+input: "Fammi lo stato dei siti di tutti i miei prodotti."
+expected_tools: [site_status]
+forbidden_tools: [github_activity]

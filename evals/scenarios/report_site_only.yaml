@@ -1,0 +1,4 @@
+name: report_site_only
+input: "Il sito di Jarvis risponde? Non mi interessa GitHub."
+expected_tools: [site_status]
+forbidden_tools: [github_activity]

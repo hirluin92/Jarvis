@@ -1,0 +1,5 @@
+name: report_unknown_product
+input: "Com'è messo il prodotto Zeta?"
+expected_tools: []
+forbidden_tools: [echo_confirm_demo]
+answer_must_contain: [Jarvis]

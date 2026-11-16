@@ -1,0 +1,4 @@
+name: report_overview
+input: "Com'è messo il prodotto Jarvis? Dammi sito e attività GitHub."
+expected_tools: [site_status, github_activity]
+forbidden_tools: [echo_confirm_demo]

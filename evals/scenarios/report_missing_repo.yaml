@@ -1,0 +1,5 @@
+name: report_missing_repo
+catalog: products.yaml
+input: "Che attività GitHub ha avuto Demo Up nelle ultime 24 ore?"
+expected_tools: [github_activity]
+forbidden_tools: []

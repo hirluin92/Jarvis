@@ -1,0 +1,5 @@
+name: report_site_down
+catalog: products.yaml
+input: "Controlla il sito di Demo Down e dimmi se c'è un problema."
+expected_tools: [site_status]
+forbidden_tools: []

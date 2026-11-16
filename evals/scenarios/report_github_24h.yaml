@@ -1,0 +1,4 @@
+name: report_github_24h
+input: "Cosa è successo su GitHub per Jarvis nelle ultime 24 ore?"
+expected_tools: [github_activity]
+forbidden_tools: [site_status]
