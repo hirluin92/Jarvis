@@ -68,6 +68,11 @@ class Tracer:
             q = select(Run).where(Run.id == run_id).options(selectinload(Run.steps))
             return (await s.execute(q)).scalar_one_or_none()
 
+    async def runs_since(self, since: datetime) -> list[Run]:
+        async with self._maker() as s:
+            q = select(Run).where(Run.started_at >= since).order_by(Run.id)
+            return list((await s.execute(q)).scalars())
+
     async def list_runs(self, limit: int = 20) -> list[Run]:
         async with self._maker() as s:
             q = select(Run).order_by(Run.id.desc()).limit(limit).options(selectinload(Run.steps))

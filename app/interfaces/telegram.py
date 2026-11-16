@@ -20,6 +20,7 @@ from app.agent.loop import (
     resume_confirmed,
     run_agent,
 )
+from app.costs import estimate_cost, format_cost
 from app.report import generate_report
 from app.tracing import Tracer
 
@@ -95,9 +96,11 @@ def build_handlers(state: BotState) -> list:
             return
         tools = [s.tool_name for s in run.steps if s.type == "tool_call"]
         dur = sum(s.duration_ms for s in run.steps)
+        cost = format_cost(estimate_cost(run.model, run.input_tokens, run.output_tokens))
         await update.effective_message.reply_text(
             f"Run {run.id} [{run.status}]\nTool: {', '.join(tools) or 'nessuno'}\n"
-            f"Durata: {dur} ms\nToken: {run.input_tokens} in / {run.output_tokens} out"
+            f"Durata: {dur} ms\nToken: {run.input_tokens} in / {run.output_tokens} out\n"
+            f"Costo stimato: {cost}"
         )
 
     async def report(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:

@@ -8,12 +8,14 @@ from sqlalchemy import text
 from app.agent.llm import AnthropicClient
 from app.agent.loop import AgentContext
 from app.config import get_settings
+from app.costs import estimate_cost
 from app.db import session as db
 from app.interfaces.telegram import BotState, build_application
 from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
+from app.web import router as web_router
 
 
 def _run_dict(run, with_steps: bool = False) -> dict:
@@ -27,6 +29,7 @@ def _run_dict(run, with_steps: bool = False) -> dict:
         "input_tokens": run.input_tokens,
         "output_tokens": run.output_tokens,
         "model": run.model,
+        "cost_usd": estimate_cost(run.model, run.input_tokens, run.output_tokens),
     }
     if with_steps:
         d["steps"] = [
@@ -93,6 +96,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
+app.include_router(web_router)
 
 
 @app.get("/health")
