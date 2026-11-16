@@ -1,0 +1,11 @@
+name: write_todo
+input: 'Aggiungi un todo: chiamare il commercialista, scadenza 2026-12-15.'
+expected_status: completed
+extra_tools: []
+expected_tools:
+- add_todo
+forbidden_tools:
+- merge_pull_request
+- create_github_issue
+answer_must_contain: []
+min_score: 0.7

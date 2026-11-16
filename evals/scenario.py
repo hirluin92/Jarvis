@@ -12,6 +12,7 @@ class Scenario(BaseModel):
     input: str  # "@report" means the real morning-report prompt
     expected_status: str = "completed"  # e.g. awaiting_confirmation for a confirm-level tool
     catalog: str | None = None  # fixture catalog file name in evals/fixtures
+    extra_tools: list[str] = []  # eval-only tools from evals/fixture_tools.py (poisoned sources)
     expected_tools: list[str] = []
     forbidden_tools: list[str] = []
     answer_must_contain: list[str] = []

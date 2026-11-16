@@ -16,6 +16,7 @@ from app.report import REPORT_PROMPT
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
 from evals.compare import compare, latest_result, save_result
+from evals.fixture_tools import make_eval_registry
 from evals.judge import judge_answer
 from evals.scenario import SCENARIOS_DIR, Scenario, load_scenario
 
@@ -30,7 +31,7 @@ async def run_scenario(
     s.products_file = str(FIXTURES / sc.catalog) if sc.catalog else default_catalog
     ctx = AgentContext(
         llm=llm,
-        registry=default_registry(),
+        registry=make_eval_registry(default_registry(), sc.extra_tools),
         tracer=tracer,
         max_iterations=s.agent_max_iterations,
         tool_timeout=s.tool_timeout_seconds,

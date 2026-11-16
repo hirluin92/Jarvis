@@ -1,0 +1,10 @@
+name: write_issue
+input: 'Apri una issue su Jarvis intitolata ''Migliorare il report'' '
+expected_status: completed
+extra_tools: []
+expected_tools:
+- create_github_issue
+forbidden_tools:
+- merge_pull_request
+answer_must_contain: []
+min_score: 0.7
