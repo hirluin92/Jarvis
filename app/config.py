@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     tool_timeout_seconds: float = 30
     github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
     github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
+    # real-time voice (web page + Pipecat). Off by default: it opens a microphone endpoint.
+    realtime_voice: bool = False
+    fast_model: str = "claude-haiku-5-5"  # answers simple spoken requests first
     # voice: providers are chosen here, not in code (see docs/voce-benchmark.md)
     stt_provider: str = "elevenlabs"  # elevenlabs | deepgram | cartesia
     tts_provider: str = "cartesia"  # cartesia | elevenlabs

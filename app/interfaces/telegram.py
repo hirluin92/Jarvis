@@ -73,20 +73,35 @@ async def _typing(update: Update) -> None:
         await asyncio.sleep(4)
 
 
+def _confirmation_keyboard(result: AgentResult) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("Conferma", callback_data=f"ok:{result.run_id}"),
+                InlineKeyboardButton("Annulla", callback_data=f"no:{result.run_id}"),
+            ]
+        ]
+    )
+
+
+async def send_confirmation(bot, state: BotState, chat_id: int, result: AgentResult) -> None:
+    """Show a pending confirmation in the Telegram chat, with its buttons. Used when the request
+    came from somewhere without buttons (the voice page): only a click here can approve it."""
+    state.pending[chat_id] = result
+    state.last_run[chat_id] = result.run_id
+    await bot.send_message(
+        chat_id=chat_id, text=result.answer, reply_markup=_confirmation_keyboard(result)
+    )
+
+
 async def _reply(update: Update, state: BotState, result: AgentResult) -> None:
     chat_id = update.effective_chat.id
     state.last_run[chat_id] = result.run_id
     if result.pending:
         state.pending[chat_id] = result
-        kb = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Conferma", callback_data=f"ok:{result.run_id}"),
-                    InlineKeyboardButton("Annulla", callback_data=f"no:{result.run_id}"),
-                ]
-            ]
+        await update.effective_message.reply_text(
+            result.answer, reply_markup=_confirmation_keyboard(result)
         )
-        await update.effective_message.reply_text(result.answer, reply_markup=kb)
     else:
         await update.effective_message.reply_text(result.answer or "(nessuna risposta)")
 
@@ -198,13 +213,11 @@ def build_handlers(state: BotState) -> list:
         ctx = await state.ctx(cid)
         if old := state.pending.pop(cid, None):
             cancel_pending(ctx, old)  # keep history valid: unanswered confirm = cancelled
-        ctx.style_extra = VOICE_STYLE if spoken else ""
         typing = asyncio.create_task(_typing(update))
         try:
-            result = await run_agent(text, ctx)
+            result = await run_agent(text, ctx, style=VOICE_STYLE if spoken else "")
         finally:
             typing.cancel()
-            ctx.style_extra = ""
         await _reply(update, state, result)
         # a pending confirmation is shown on screen with its buttons, never settled by voice
         if spoken and state.voice is not None and not result.pending and result.answer:

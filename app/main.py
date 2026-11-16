@@ -8,18 +8,20 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
-from app.agent.llm import AnthropicClient
+from app.agent.llm import AnthropicClient, RoutedLLM
 from app.agent.loop import AgentContext
 from app.config import get_settings
 from app.conversations import ConversationStore
 from app.costs import estimate_cost
 from app.db import session as db
-from app.interfaces.telegram import BotState, build_application
+from app.interfaces.telegram import BotState, build_application, send_confirmation
 from app.memory import MemoryStore
 from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
+from app.voice.realtime import RealtimeSessions, VoiceTurnHandler
+from app.voice.routes import build_realtime_router
 from app.voice.service import VoiceService
 from app.web import router as web_router
 
@@ -90,20 +92,38 @@ async def lifespan(app: FastAPI):
     app.state.tracer = tracer
     app.state.memory = memory
     app.state.csrf_token = secrets.token_urlsafe(32)  # guards the web page's edit/forget forms
-    bot = build_application(
-        s.telegram_bot_token,
-        BotState(
-            set(s.telegram_allowed_user_ids),
-            make_context,
-            tracer,
-            conversations=conversations,
-            memory=memory,
-            voice=voice,
-        ),
+    bot_state = BotState(
+        set(s.telegram_allowed_user_ids),
+        make_context,
+        tracer,
+        conversations=conversations,
+        memory=memory,
+        voice=voice,
     )
+    bot = build_application(s.telegram_bot_token, bot_state)
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
+
+    realtime: RealtimeSessions | None = None
+    if s.realtime_voice:
+        if voice is None or not s.telegram_allowed_user_ids:
+            log.warning("real-time voice disabled: needs working voice keys and an allowed user")
+        else:
+            chat_id = s.telegram_allowed_user_ids[0]  # the voice page shares this Telegram chat
+            routed = RoutedLLM(AnthropicClient(s.anthropic_api_key, s.fast_model, "low"), llm)
+
+            async def confirm_on_telegram(result) -> None:
+                await send_confirmation(bot.bot, bot_state, chat_id, result)
+
+            handler = VoiceTurnHandler(lambda: bot_state.ctx(chat_id), routed, confirm_on_telegram)
+            realtime = RealtimeSessions(s, handler)
+            app.state.realtime = realtime
+            from pipecat_ai_prebuilt.frontend import PipecatPrebuiltUI
+
+            app.include_router(build_realtime_router())
+            app.mount("/client", PipecatPrebuiltUI)
+            log.info("real-time voice on: open http://localhost:8000/client/")
 
     async def send_report(text: str) -> None:
         for user_id in s.telegram_allowed_user_ids:
@@ -120,6 +140,8 @@ async def lifespan(app: FastAPI):
     )
     yield
     report_task.cancel()
+    if realtime is not None:
+        await realtime.close()
     await bot.updater.stop()
     await bot.stop()
     await bot.shutdown()

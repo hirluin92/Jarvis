@@ -213,8 +213,31 @@ Cartesia Ink 5-6%; il primo audio della sintesi arriva in 86-330 ms su tutte le 
 servizi sbagliano "No, annulla" (sentito come "a nulla"). I fornitori NON sono ancora fissati:
 manca la prova con le registrazioni vere dell'utente e l'ascolto delle voci.
 
-Da fare: il passo 2 (conversazione in tempo reale con Pipecat, da una pagina web sul telefono),
-che misura anche la latenza in streaming; instradamento per latenza (modello piccolo per le
-richieste semplici).
+### Passo 2: conversazione in tempo reale (implementato, NON ancora provato dal vivo)
+
+Pipecat 1.16 (WebRTC + interfaccia web già pronta su `http://localhost:8000/client/`). Pipeline:
+audio in, trascrizione in streaming (ElevenLabs Scribe v2 Realtime), regole del turno con
+rilevamento della voce (Silero), il "cervello" (chiama `run_agent`, lo stesso agente di Telegram),
+voce (Cartesia Lorenzo), audio out. Scelte:
+- Stessa conversazione di Telegram (cronologia, memoria, azioni condivise); un blocco per
+  conversazione impedisce che due richieste si mescolino.
+- Le conferme `confirm` NON si danno a voce: la richiesta va su Telegram con i pulsanti e a voce
+  si dice solo che è stata inviata (criterio 4).
+- Instradamento per latenza: Haiku 5.5 a basso sforzo risponde per primo; se serve un tool, o
+  dopo i risultati dei tool, decide il modello principale (`FAST_MODEL`).
+- Interruzione: se l'utente parla mentre il bot parla o aspetta, la voce si ferma; l'agente
+  finisce comunque in background (storia e tracciamento restano coerenti) e la risposta
+  tardiva non viene detta. I turni provvisori ("speculation") non vengono mai risposti.
+- Latenza di ogni turno scritta sul run (`voice_latency`: trascrizione, agente, voce, totale),
+  visibile in `/ui/runs/{id}`.
+- Spenta di default (`REALTIME_VOICE=false`): apre un microfono. Ascolta solo su 127.0.0.1.
+- Solo ElevenLabs (trascrizione) e Cartesia (voce) sono supportati in tempo reale.
+
+Limiti noti: dal telefono serve HTTPS (i browser bloccano il microfono su pagine non sicure,
+tranne localhost); si fa con la rete privata della fase 7. Nessuna autenticazione sulle rotte:
+va bene finché il server ascolta solo in locale, da aggiungere prima di esporlo.
+
+Da fare: provarlo dal vivo (criteri 2 e 3 sulla latenza e l'interruzione), poi eventuale
+streaming dei token dell'agente alla voce se serve stare sotto 1,5 s.
 
 La fase 7 NON è iniziata.

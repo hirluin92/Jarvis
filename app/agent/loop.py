@@ -60,7 +60,7 @@ class AgentContext:
     summary: str = ""  # folded-in older part of the conversation
     summary_threshold: int | None = None  # summarise when history grows beyond this many messages
     keep_recent: int = 12  # messages kept verbatim after a summary
-    style_extra: str = ""  # extra answer-style instruction for the current run (e.g. spoken)
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # one run at a time per conversation
 
 
 def _trim(history: list[dict[str, Any]], limit: int) -> None:
@@ -103,10 +103,11 @@ async def _loop(
     tokens: list[int],
     max_iter: int,
     system: str,
+    llm: LLMClient,
 ) -> AgentResult:
     for _ in range(max_iter):
         t0 = time.monotonic()
-        resp = await ctx.llm.complete(system, messages, ctx.registry.definitions())
+        resp = await llm.complete(system, messages, ctx.registry.definitions())
         tokens[0] += resp.input_tokens
         tokens[1] += resp.output_tokens
         await ctx.tracer.add_step(
@@ -189,11 +190,11 @@ SUMMARY_SYSTEM = (
 )
 
 
-async def _system_for(ctx: AgentContext, user_message: str) -> str:
+async def _system_for(ctx: AgentContext, user_message: str, style: str = "") -> str:
     """The system prompt plus what this run should know: older-conversation summary, saved facts."""
     parts = [SYSTEM_PROMPT]
-    if ctx.style_extra:
-        parts.append(ctx.style_extra)
+    if style:
+        parts.append(style)
     if ctx.summary:
         parts.append(f"Summary of the earlier conversation (data):\n{ctx.summary}")
     if ctx.system_extra is not None:
@@ -272,15 +273,33 @@ async def _persist(ctx: AgentContext) -> None:
             log.exception("could not save the conversation")
 
 
-async def run_agent(user_message: str, context: AgentContext) -> AgentResult:
+async def run_agent(
+    user_message: str,
+    context: AgentContext,
+    *,
+    style: str = "",
+    llm: LLMClient | None = None,
+) -> AgentResult:
+    """Run the agent on one message. `style` adds an answer-style instruction for this run only
+    (e.g. spoken replies); `llm` overrides the model for this run only (e.g. a fast router).
+
+    Runs on the same conversation are serialised: Telegram and a voice session can share one.
+    """
+    async with context.lock:
+        return await _run_agent(user_message, context, style, llm or context.llm)
+
+
+async def _run_agent(
+    user_message: str, context: AgentContext, style: str, llm: LLMClient
+) -> AgentResult:
     run_id = await context.tracer.start_run(user_message, context.llm.model)
     current_run_id.set(run_id)
     context.history.append({"role": "user", "content": user_message})
     _trim(context.history, context.history_limit)
     try:
-        system = await _system_for(context, user_message)
+        system = await _system_for(context, user_message, style)
         result = await _loop(
-            context, run_id, context.history, 0, [0, 0], context.max_iterations, system
+            context, run_id, context.history, 0, [0, 0], context.max_iterations, system, llm
         )
     except Exception as e:
         await context.tracer.finish_run(run_id, "failed", f"{type(e).__name__}: {e}", 0, 0)
@@ -293,6 +312,11 @@ async def run_agent(user_message: str, context: AgentContext) -> AgentResult:
 
 async def resume_confirmed(context: AgentContext, result: AgentResult) -> AgentResult:
     """Execute a pending confirm-level action after explicit user approval and finish the run."""
+    async with context.lock:
+        return await _resume_confirmed(context, result)
+
+
+async def _resume_confirmed(context: AgentContext, result: AgentResult) -> AgentResult:
     p = result.pending
     assert p is not None
     run_id = await context.tracer.start_run(f"[confirmed] {p.describe()}", context.llm.model)
