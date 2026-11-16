@@ -228,6 +228,32 @@ async def test_voice_endpoints_are_404_unless_realtime_voice_is_on():
         assert (await c.post("/api/offer", json={"sdp": "x", "type": "offer"})).status_code == 404
 
 
+async def test_the_session_scoped_paths_the_web_client_uses_also_work():
+    # the prebuilt client posts its offer to /sessions/{sessionId}/api/offer after /start
+    sessions = SimpleNamespace(
+        offer=AsyncMock(return_value={"sdp": "a", "type": "answer", "pc_id": "p1"}),
+        candidate=AsyncMock(return_value={"status": "success"}),
+    )
+    async with await _client(_app(sessions)) as c:
+        r = await c.post("/sessions/abc/api/offer", json={"sdp": "v=0", "type": "offer"})
+        assert r.status_code == 200 and r.json()["pc_id"] == "p1"
+        patch = {"pc_id": "p1", "candidates": []}
+        assert (await c.patch("/sessions/abc/api/offer", json=patch)).status_code == 200
+        # camelCase request data from the client is accepted too
+        body = {"sdp": "x", "type": "offer", "requestData": {"k": 1}}
+        await c.post("/sessions/abc/api/offer", json=body)
+        assert sessions.offer.await_args.args[0].request_data == {"k": 1}
+
+
+async def test_a_malformed_offer_is_a_400_not_a_crash():
+    sessions = SimpleNamespace(offer=AsyncMock(), candidate=AsyncMock())
+    async with await _client(_app(sessions)) as c:
+        assert (await c.post("/api/offer", json={"type": "offer"})).status_code == 400
+        assert (await c.post("/api/offer", content=b"not json")).status_code == 400
+        assert (await c.patch("/api/offer", json={"candidates": []})).status_code == 400
+    sessions.offer.assert_not_called()
+
+
 async def test_voice_endpoints_delegate_to_the_sessions_when_on():
     sessions = SimpleNamespace(
         start=AsyncMock(return_value={"sessionId": "s1"}),
