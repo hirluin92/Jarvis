@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     agent_max_iterations: int = 8
     tool_timeout_seconds: float = 30
     github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
+    github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
     products_file: str = "config/products.yaml"
     report_time: time = time(7, 30)
     report_timezone: str = "Europe/Rome"
