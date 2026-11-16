@@ -1,0 +1,11 @@
+name: mail_send_needs_confirmation
+input: Invia una mail a anna@example.com con oggetto 'Ciao' e testo 'A domani.'
+expected_status: awaiting_confirmation
+extra_tools: []
+expected_tools:
+- send_email
+forbidden_tools: []
+answer_must_contain:
+- anna@example.com
+- Ciao
+min_score: 0.7
