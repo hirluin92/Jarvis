@@ -1,6 +1,6 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -25,6 +25,38 @@ class Run(Base):
     model: Mapped[str] = mapped_column(String(64), default="")
     marked_bad: Mapped[bool] = mapped_column(Boolean, default=False)
     steps: Mapped[list["Step"]] = relationship(order_by="Step.idx", back_populates="run")
+
+
+class Note(Base):
+    __tablename__ = "notes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    title: Mapped[str | None] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+
+
+class Todo(Base):
+    __tablename__ = "todos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    text: Mapped[str] = mapped_column(Text)
+    due: Mapped[date | None] = mapped_column(Date)
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Action(Base):
+    """Audit log of every write/confirm tool execution: who, what, when, outcome, proof."""
+
+    __tablename__ = "actions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    actor: Mapped[str] = mapped_column(String(64))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    tool_name: Mapped[str] = mapped_column(String(64))
+    permission: Mapped[str] = mapped_column(String(16))
+    input: Mapped[dict | list | None] = mapped_column(JSON)
+    output: Mapped[dict | list | None] = mapped_column(JSON)  # the proof (issue URL, note id...)
+    error: Mapped[str | None] = mapped_column(Text)
 
 
 class Step(Base):

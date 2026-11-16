@@ -8,16 +8,26 @@ from app.agent.prompts import SYSTEM_PROMPT
 from app.tools.registry import ToolInputError, ToolRegistry
 from app.tracing import Tracer
 
+CONFIRM_TTL_SECONDS = 600  # a confirmation is valid for 10 minutes and for one action only
+
 
 @dataclass
 class PendingAction:
     tool_name: str
     tool_input: dict[str, Any]
     tool_use_id: str
+    summary: str = ""  # what the tool says it will do; shown to the user in the confirmation
+    created_at: float = field(default_factory=time.monotonic)
 
     def describe(self) -> str:
         args = ", ".join(f"{k}={v!r}" for k, v in self.tool_input.items())
         return f"{self.tool_name}({args})"
+
+    def label(self) -> str:
+        return self.summary or self.describe()
+
+    def expired(self, now: float | None = None) -> bool:
+        return (time.monotonic() if now is None else now) - self.created_at > CONFIRM_TTL_SECONDS
 
 
 @dataclass
@@ -37,6 +47,7 @@ class AgentContext:
     max_iterations: int = 8
     tool_timeout: float = 30
     history_limit: int = 20
+    actor: str = "system"  # who asked, written to the actions log (e.g. "telegram:123")
 
 
 def _trim(history: list[dict[str, Any]], limit: int) -> None:
@@ -58,6 +69,17 @@ async def _run_tool(ctx: AgentContext, name: str, raw: dict[str, Any]) -> tuple[
         return None, f"Tool {name} timed out after {ctx.tool_timeout}s"
     except Exception as e:  # noqa: BLE001 - tool errors go back to the model
         return None, f"{type(e).__name__}: {e}"
+
+
+async def _record_action(
+    ctx: AgentContext, run_id: int, name: str, tool_input: dict[str, Any], out: Any, err: str | None
+) -> None:
+    """Write/confirm tool executions go to the actions log, with their proof (the tool output)."""
+    tool = ctx.registry.get(name)
+    if tool is not None and tool.permission in ("write", "confirm"):
+        await ctx.tracer.record_action(
+            ctx.actor, run_id, name, tool.permission, tool_input, out, err
+        )
 
 
 async def _loop(
@@ -92,7 +114,9 @@ async def _loop(
         for tu in resp.tool_uses:
             tool = ctx.registry.get(tu.name)
             if tool and tool.permission == "confirm":
-                pending = PendingAction(tu.name, tu.input, tu.id)
+                pending = PendingAction(
+                    tu.name, tu.input, tu.id, ctx.registry.describe(tu.name, tu.input)
+                )
                 await ctx.tracer.add_step(
                     run_id,
                     idx,
@@ -101,7 +125,7 @@ async def _loop(
                     input=tu.input,
                     error="awaiting confirmation",
                 )
-                msg = f"Conferma richiesta: {pending.describe()}"
+                msg = f"Conferma richiesta: {pending.label()}"
                 r = await _finish(ctx, run_id, "awaiting_confirmation", msg, tokens)
                 r.pending = pending
                 return r
@@ -117,6 +141,7 @@ async def _loop(
                 error=err,
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
+            await _record_action(ctx, run_id, tu.name, tu.input, out, err)
             idx += 1
             results.append(
                 {
@@ -165,6 +190,7 @@ async def resume_confirmed(context: AgentContext, result: AgentResult) -> AgentR
     await context.tracer.add_step(
         run_id, 0, "tool_call", tool_name=p.tool_name, input=p.tool_input, output=out, error=err
     )
+    await _record_action(context, run_id, p.tool_name, p.tool_input, out, err)
     context.history.append(
         {
             "role": "user",

@@ -14,6 +14,8 @@ class Tool:
     input_model: type[BaseModel]
     permission: Permission
     func: Callable[[Any], Awaitable[Any]]
+    # human-readable summary of what the call will do, shown in the confirmation message
+    describe: Callable[[Any], str] | None = None
 
 
 class ToolInputError(Exception):
@@ -49,6 +51,17 @@ class ToolRegistry:
         except ValidationError as e:
             msgs = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors())
             raise ToolInputError(f"Invalid input for {name}: {msgs}") from e
+
+    def describe(self, name: str, raw: dict[str, Any]) -> str:
+        """What a call will do, for the confirmation message; generic if the tool has no text."""
+        tool = self._tools[name]
+        if tool.describe is not None:
+            try:
+                return tool.describe(self.validate(name, raw))
+            except Exception:  # noqa: BLE001 - a broken summary must not block the confirmation
+                pass
+        args = ", ".join(f"{k}={v!r}" for k, v in raw.items())
+        return f"{name}({args})"
 
     async def execute(self, name: str, raw: dict[str, Any]) -> Any:
         return await self._tools[name].func(self.validate(name, raw))

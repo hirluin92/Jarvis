@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Run, Step
+from app.db.models import Action, Run, Step
 
 
 class Tracer:
@@ -62,6 +62,35 @@ class Tracer:
             run.input_tokens, run.output_tokens = in_tok, out_tok
             run.finished_at = datetime.now(UTC)
             await s.commit()
+
+    async def record_action(
+        self,
+        actor: str,
+        run_id: int | None,
+        tool_name: str,
+        permission: str,
+        input: Any,
+        output: Any,
+        error: str | None,
+    ) -> None:
+        async with self._maker() as s:
+            s.add(
+                Action(
+                    actor=actor,
+                    run_id=run_id,
+                    tool_name=tool_name,
+                    permission=permission,
+                    input=input,
+                    output=output,
+                    error=error,
+                )
+            )
+            await s.commit()
+
+    async def list_actions(self, limit: int = 10) -> list[Action]:
+        async with self._maker() as s:
+            q = select(Action).order_by(Action.id.desc()).limit(limit)
+            return list((await s.execute(q)).scalars())
 
     async def mark_bad(self, run_id: int) -> bool:
         async with self._maker() as s:

@@ -13,6 +13,7 @@ from telegram.ext import (
     filters,
 )
 
+from app.actions_view import format_action
 from app.agent.loop import (
     AgentContext,
     AgentResult,
@@ -39,7 +40,9 @@ class BotState:
 
     def ctx(self, chat_id: int) -> AgentContext:
         if chat_id not in self.contexts:
-            self.contexts[chat_id] = self.make_context()
+            ctx = self.make_context()
+            ctx.actor = f"telegram:{chat_id}"
+            self.contexts[chat_id] = ctx
         return self.contexts[chat_id]
 
 
@@ -104,6 +107,13 @@ def build_handlers(state: BotState) -> list:
             f"Costo stimato: {cost}"
         )
 
+    async def actions(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        rows = await state.tracer.list_actions(10)
+        text = "\n".join(format_action(a) for a in rows) or "Nessuna azione registrata."
+        await update.effective_message.reply_text(text)
+
     async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -153,8 +163,12 @@ def build_handlers(state: BotState) -> list:
         if pending is None or str(pending.run_id) != run_id:
             await q.edit_message_text("Richiesta scaduta o già usata.")
             return
-        state.pending.pop(cid)
+        state.pending.pop(cid)  # single use: a second click finds nothing
         ctx = state.ctx(cid)
+        if pending.pending is not None and pending.pending.expired():
+            cancel_pending(ctx, pending)
+            await q.edit_message_text("Richiesta scaduta (oltre 10 minuti): azione non eseguita.")
+            return
         if action == "ok":
             res = await resume_confirmed(ctx, pending)
             await q.edit_message_text(res.answer)
@@ -168,6 +182,7 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("last", last),
         CommandHandler("report", report),
         CommandHandler("bad", bad),
+        CommandHandler("actions", actions),
         CallbackQueryHandler(on_button),
         MessageHandler(filters.TEXT & ~filters.COMMAND, on_text),
     ]
