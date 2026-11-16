@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -73,6 +74,141 @@ class AnthropicClient:
             elif b.type == "tool_use":
                 out.tool_uses.append(ToolUse(b.id, b.name, dict(b.input)))
         return out
+
+
+class GeminiClient:
+    """Google Gemini over REST (free tier available). Same contract as AnthropicClient: the
+    agent keeps its history in Anthropic's block format and this class translates it."""
+
+    BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def __init__(self, api_key: str, model: str, client: Any = None) -> None:
+        import httpx
+
+        self._key = api_key
+        self.model = model
+        self._http = client or httpx.AsyncClient(timeout=60)
+
+    @staticmethod
+    def _contents(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        names: dict[str, str] = {}  # tool_use id -> tool name (Gemini answers by name)
+        out: list[dict[str, Any]] = []
+        for m in messages:
+            role = "user" if m["role"] == "user" else "model"
+            if isinstance(m["content"], str):
+                out.append({"role": role, "parts": [{"text": m["content"]}]})
+                continue
+            parts: list[dict[str, Any]] = []
+            for b in m["content"]:
+                if b["type"] == "text" and b["text"]:
+                    parts.append({"text": b["text"]})
+                elif b["type"] == "tool_use":
+                    names[b["id"]] = b["name"]
+                    part: dict[str, Any] = {"functionCall": {"name": b["name"], "args": b["input"]}}
+                    if "|" in b["id"]:  # Gemini 3 wants its thought signature handed back
+                        part["thoughtSignature"] = b["id"].split("|", 1)[1]
+                    parts.append(part)
+                elif b["type"] == "tool_result":
+                    content = b["content"]
+                    if not isinstance(content, str):
+                        content = "".join(c.get("text", "") for c in content)
+                    parts.append(
+                        {
+                            "functionResponse": {
+                                "name": names.get(b["tool_use_id"], "tool"),
+                                "response": {"result": content},
+                            }
+                        }
+                    )
+            if parts:
+                out.append({"role": role, "parts": parts})
+        return out
+
+    async def complete(self, system, messages, tools, on_text: TextSink | None = None):
+        import json
+
+        body: dict[str, Any] = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": self._contents(messages),
+            "generationConfig": {"maxOutputTokens": 2048},
+        }
+        if tools:
+            body["tools"] = [
+                {
+                    "functionDeclarations": [
+                        {
+                            "name": t["name"],
+                            "description": t["description"],
+                            "parametersJsonSchema": t["input_schema"],
+                        }
+                        for t in tools
+                    ]
+                }
+            ]
+        headers = {"x-goog-api-key": self._key}
+        out = LLMResponse(model=self.model)
+        usage: dict[str, Any] = {}
+
+        def take(chunk: dict[str, Any]) -> list[str]:
+            texts: list[str] = []
+            usage.update(chunk.get("usageMetadata") or {})
+            for cand in chunk.get("candidates") or []:
+                for part in (cand.get("content") or {}).get("parts") or []:
+                    if part.get("text") and not part.get("thought"):
+                        texts.append(part["text"])
+                    elif "functionCall" in part:
+                        fc = part["functionCall"]
+                        n = len(out.tool_uses)
+                        args = dict(fc.get("args") or {})
+                        sig = part.get("thoughtSignature")
+                        call_id = f"call_{n}|{sig}" if sig else f"call_{n}"
+                        out.tool_uses.append(ToolUse(call_id, fc["name"], args))
+            return texts
+
+        if on_text is None:
+            url = f"{self.BASE}/{self.model}:generateContent"
+            for attempt in range(4):  # free tier: busy (503) or rate-limited (429) now and then
+                r = await self._http.post(url, json=body, headers=headers)
+                if r.status_code not in (429, 503) or attempt == 3:
+                    break
+                await asyncio.sleep(2**attempt)
+            r.raise_for_status()
+            out.text = "".join(take(r.json()))
+        else:
+            url = f"{self.BASE}/{self.model}:streamGenerateContent?alt=sse"
+            for attempt in range(4):
+                async with self._http.stream("POST", url, json=body, headers=headers) as r:
+                    if r.status_code in (429, 503) and attempt < 3:
+                        await r.aread()
+                    else:
+                        if r.status_code >= 400:
+                            await r.aread()
+                            r.raise_for_status()
+                        async for line in r.aiter_lines():
+                            if line.startswith("data:"):
+                                for piece in take(json.loads(line[5:])):
+                                    out.text += piece
+                                    await on_text(piece)
+                        break
+                await asyncio.sleep(2**attempt)
+            await on_text("\n")
+        out.input_tokens = usage.get("promptTokenCount", 0)
+        out.output_tokens = usage.get("candidatesTokenCount", 0)
+        return out
+
+
+def build_llms(s: Any) -> tuple[LLMClient, LLMClient]:
+    """(main, fast) models for the provider chosen in LLM_PROVIDER."""
+    if s.llm_provider == "gemini":
+        return GeminiClient(s.gemini_api_key, s.gemini_model), GeminiClient(
+            s.gemini_api_key, s.gemini_fast_model
+        )
+    if s.llm_provider == "anthropic":
+        return (
+            AnthropicClient(s.anthropic_api_key, s.anthropic_model),
+            AnthropicClient(s.anthropic_api_key, s.fast_model, "low"),
+        )
+    raise ValueError(f"unknown LLM_PROVIDER: {s.llm_provider}")
 
 
 class RoutedLLM:

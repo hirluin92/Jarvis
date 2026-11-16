@@ -8,7 +8,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
-from app.agent.llm import AnthropicClient, RoutedLLM
+from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext
 from app.config import get_settings
 from app.conversations import ConversationStore
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
     s = get_settings()  # fails fast with a clear pydantic error if a variable is missing
     db.init_db(s.database_url)
     tracer = Tracer(db.session_maker())
-    llm = AnthropicClient(s.anthropic_api_key, s.anthropic_model)
+    llm, fast = build_llms(s)
     registry = default_registry()
 
     memory = MemoryStore(db.session_maker())
@@ -111,7 +111,6 @@ async def lifespan(app: FastAPI):
             log.warning("real-time voice disabled: needs working voice keys and an allowed user")
         else:
             chat_id = s.telegram_allowed_user_ids[0]  # the voice page shares this Telegram chat
-            fast = AnthropicClient(s.anthropic_api_key, s.fast_model, "low")
             routed = RoutedLLM(fast, llm, registry.names_with("read"))
 
             async def confirm_on_telegram(result) -> None:

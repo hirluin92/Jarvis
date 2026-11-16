@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from app.agent.llm import AnthropicClient, RoutedLLM
+from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext, run_agent
 from app.agent.prompts import VOICE_STYLE
 from app.config import get_settings
@@ -26,9 +26,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 RESULTS = Path(__file__).parent / "results"
 
 
-async def run_scenario(
-    sc: Scenario, tracer: Tracer, llm: AnthropicClient, s, default_catalog: str
-) -> dict:
+async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: str) -> dict:
     # a scenario may point at a fixture catalog (e.g. one with a site that is down)
     s.products_file = str(FIXTURES / sc.catalog) if sc.catalog else default_catalog
     ctx = AgentContext(
@@ -46,7 +44,7 @@ async def run_scenario(
     t0 = time.monotonic()
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
     if sc.routed:  # exactly what a spoken turn does: fast model first, spoken answer style
-        fast = AnthropicClient(s.anthropic_api_key, s.fast_model, "low")
+        _, fast = build_llms(s)
         router = RoutedLLM(fast, llm, ctx.registry.names_with("read"))
         result = await run_agent(question, ctx, style=VOICE_STYLE, llm=router)
     else:
@@ -103,7 +101,7 @@ async def main(max_cost: float | None) -> int:
     async with engine().begin() as c:
         await c.run_sync(Base.metadata.create_all)
     tracer = Tracer(session_maker())
-    llm = AnthropicClient(s.anthropic_api_key, s.anthropic_model)
+    llm, _ = build_llms(s)
     scenarios = [load_scenario(p) for p in sorted(SCENARIOS_DIR.glob("*.yaml"))]
     rows: list[dict] = []
     spent = 0.0

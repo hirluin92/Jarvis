@@ -9,7 +9,11 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    anthropic_api_key: str
+    llm_provider: str = "gemini"  # gemini (free tier) | anthropic
+    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash"
+    gemini_fast_model: str = "gemini-3.5-flash-lite"
     anthropic_model: str = "claude-sonnet-5-5"
     database_url: str
     telegram_bot_token: str
