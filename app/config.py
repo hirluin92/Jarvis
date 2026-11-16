@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     realtime_voice: bool = False
     # empty = web pages open (local use); set it before reaching Jarvis from other devices
     access_token: str = ""
+    # remote clients (phone) can interrupt Jarvis by voice only with headphones: echo otherwise
+    remote_barge_in: bool = False
     fast_model: str = "claude-haiku-5-5"  # answers simple spoken requests first
     # words the real-time transcription should favour (comma separated)
     stt_keyterms: str = "Jarvis,annulla,conferma,Telegram,GitHub,Gmail,promemoria,che ore sono"

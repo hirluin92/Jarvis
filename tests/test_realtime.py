@@ -473,3 +473,14 @@ def test_realtime_voice_refuses_providers_it_does_not_support():
 
     with pytest.raises(ValueError, match="STT_PROVIDER=elevenlabs|deepgram"):
         asyncio.run(build())
+
+
+def test_requests_through_tailscale_count_as_remote():
+    from app.voice.routes import is_remote
+
+    def req(headers):
+        return SimpleNamespace(headers=headers)
+
+    assert is_remote(req({"tailscale-user-login": "x@y"}))
+    assert is_remote(req({"x-forwarded-for": "100.1.2.3"}))
+    assert not is_remote(req({"host": "localhost:8000"}))

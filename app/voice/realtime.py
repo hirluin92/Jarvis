@@ -174,9 +174,14 @@ class VoiceTurnHandler:
         log.info("voice turn latency: %s", parts)
 
 
-def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> tuple[Any, Any]:
+def build_session(
+    connection: Any, settings: Any, handler: VoiceTurnHandler, mute_while_speaking: bool = False
+) -> tuple[Any, Any]:
     """The Pipecat pipeline of one browser session: audio in -> transcript -> turns -> agent ->
-    voice -> audio out. Returns (task, runner)."""
+    voice -> audio out. Returns (task, runner).
+
+    `mute_while_speaking`: ignore the microphone while Jarvis talks (no interruption by voice).
+    Used for phones, where the speaker feeds back into the microphone and Jarvis answers himself."""
     from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
     from pipecat.audio.vad.silero import SileroVADAnalyzer
     from pipecat.frames.frames import (
@@ -198,6 +203,7 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
     from pipecat.transcriptions.language import Language
     from pipecat.transports.base_transport import TransportParams
     from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+    from pipecat.turns.user_mute.always_user_mute_strategy import AlwaysUserMuteStrategy
     from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
     from pipecat.turns.user_turn_strategies import UserTurnStrategies
     from pipecat.workers.runner import WorkerRunner
@@ -280,6 +286,7 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
             user_turn_strategies=UserTurnStrategies(stop=[turn_stop]),
+            user_mute_strategies=[AlwaysUserMuteStrategy()] if mute_while_speaking else [],
         ),
     )
     pipeline = Pipeline(
@@ -323,9 +330,12 @@ class RealtimeSessions:
             result["iceConfig"] = {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
         return result
 
-    async def offer(self, request: Any) -> dict[str, str] | None:
+    async def offer(self, request: Any, remote: bool = False) -> dict[str, str] | None:
+        # a remote client (the phone, through Tailscale) hears itself: no voice interruption there
+        mute = remote and not getattr(self._settings, "remote_barge_in", False)
+
         async def on_connection(connection: Any) -> None:
-            task, runner = build_session(connection, self._settings, self._handler)
+            task, runner = build_session(connection, self._settings, self._handler, mute)
             run = asyncio.create_task(runner.run(task))
             self._tasks.add(run)
             run.add_done_callback(self._tasks.discard)

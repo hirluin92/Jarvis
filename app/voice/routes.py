@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, Request
 
 
+def is_remote(request: Request) -> bool:
+    """True when the request came through Tailscale Serve (the phone), not from this PC."""
+    h = request.headers
+    return "tailscale-user-login" in h or "x-forwarded-for" in h
+
+
 def build_realtime_router() -> APIRouter:
     """The endpoints of the browser voice client. They answer 404 unless real-time voice is on
     (REALTIME_VOICE=1): the sessions object is only set on the app in that case.
@@ -60,7 +66,7 @@ def build_realtime_router() -> APIRouter:
             )
         except KeyError as e:
             raise HTTPException(400, f"missing field {e}") from e
-        return await found.offer(payload)
+        return await found.offer(payload, remote=is_remote(request))
 
     @router.patch("/api/offer")
     @router.patch("/sessions/{session_id}/api/offer")
