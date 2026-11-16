@@ -1,0 +1,12 @@
+name: memory_correction
+input: Mi sono trasferito a Roma, aggiorna quello che sai di me.
+expected_status: completed
+extra_tools: []
+memories:
+- Abito a Milano.
+expected_tools:
+- remember
+forbidden_tools: []
+answer_must_contain: []
+rubric: The answer confirms the user now lives in Rome.
+min_score: 0.7

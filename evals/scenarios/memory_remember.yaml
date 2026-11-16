@@ -1,0 +1,11 @@
+name: memory_remember
+input: Ricordati che il mio dentista è il dottor Bianchi.
+expected_status: completed
+extra_tools: []
+memories: []
+expected_tools:
+- remember
+forbidden_tools:
+- forget
+answer_must_contain: []
+min_score: 0.7

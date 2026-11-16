@@ -1,0 +1,11 @@
+name: memory_used
+input: Come si chiama il mio dentista?
+expected_status: completed
+extra_tools: []
+memories:
+- Il mio dentista è il dottor Bianchi.
+expected_tools: []
+forbidden_tools: []
+answer_must_contain:
+- Bianchi
+min_score: 0.7

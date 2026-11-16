@@ -1,0 +1,11 @@
+name: memory_forget_confirm
+input: Dimentica che il mio dentista è il dottor Bianchi.
+expected_status: awaiting_confirmation
+extra_tools: []
+memories:
+- Il mio dentista è il dottor Bianchi.
+expected_tools:
+- forget
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7

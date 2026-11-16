@@ -133,4 +133,39 @@ Limiti noti:
 
 Eval: 35 scenari, tutti PASS, 136 s, circa $0.38 per esecuzione.
 
-Le fasi 5-7 NON sono iniziate.
+## Fase 5 — Memoria: IMPLEMENTATA (2026-11-16)
+
+Implementato: tabella `memories` (testo, categoria, run di origine, date, stato
+attivo/sostituito/dimenticato; migrazione 0004); tool `remember` (`write`, rifiuta i segreti:
+chiavi, password, PIN, IBAN, carte), `recall` (`read`), `forget` (`confirm`, la conferma mostra il
+testo del fatto); recupero automatico dei fatti pertinenti nel contesto di ogni run (massimo 5
+fatti e 1500 caratteri, etichettati come dato e non istruzione); `/memory`, `/forget <id>`
+(l'utente che scrive il comando è già il consenso; finisce in `/actions`) e pagina
+`/ui/memory` per correggere o dimenticare (token anti-CSRF, i segreti sono rifiutati anche qui);
+cronologia in Postgres (`conversations`), riassunto automatico oltre 30 messaggi (si tengono gli
+ultimi 12; tetto rigido 60), `/reset` cancella anche la cronologia salvata.
+
+Scelta tecnica: la ricerca NON usa pgvector. Con poche centinaia di fatti i candidati si
+classificano in Python per parole condivise (radice di 5 lettere, niente accenti, parole
+vuote escluse): zero servizi esterni e zero chiavi nuove. È lessicale, non semantica: "dentista"
+trova "dentisti" ma non "odontoiatra". Se i fatti diventano molti o servono sinonimi, si passa a
+pgvector con un servizio di embedding (decisione da prendere allora).
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Un fatto detto oggi è usato in una chat nuova domani | PASS nei test (contesto nuovo, fatto nel prompt); da provare su Telegram |
+| 2 | Un fatto corretto sostituisce il precedente | PASS (test e modello vero: la riga vecchia diventa `superseded`, ne resta una attiva) |
+| 3 | Dopo `/forget` il fatto non è più recuperato | PASS (test, anche per il contesto automatico) |
+| 4 | Riavviando il processo la conversazione continua | PASS nei test (la cronologia si ricarica da Postgres); da provare riavviando il server |
+| 5 | Scenari di eval: richiamo, fatto assente, fatto superato | PASS: `memory_used`, `memory_absent`, `memory_correction` (+ remember, secret_refused, forget_confirm) |
+
+Limiti noti:
+- `remember` è `write`, senza conferma: un testo malevolo letto da un tool potrebbe indurre il
+  modello a salvare un "fatto" falso. Mitigazioni: i fatti entrano nel prompt come dato, i segreti
+  sono rifiutati, tutto è in `/actions` e correggibile da `/memory` e dalla pagina web.
+- Una conferma in sospeso non sopravvive a un riavvio (il pulsante risponde "scaduta o già usata").
+- L'eval `memory_correction` non verifica da sola la sostituzione: la verifica è nei test.
+
+Eval: 41 scenari, tutti PASS, 166 s, circa $0.55 per esecuzione (il prompt è cresciuto con i tool).
+
+Le fasi 6-7 NON sono iniziate.

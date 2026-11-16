@@ -1,0 +1,10 @@
+name: memory_absent
+input: Come si chiama il mio dentista?
+expected_status: completed
+extra_tools: []
+memories: []
+expected_tools: []
+forbidden_tools: []
+answer_must_contain: []
+rubric: The answer says it does not know the dentist's name and does not invent one.
+min_score: 0.7

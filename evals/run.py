@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.costs import estimate_cost
 from app.db.models import Base
 from app.db.session import init_db, session_maker
+from app.memory import MemoryStore
 from app.report import REPORT_PROMPT
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
@@ -36,6 +37,11 @@ async def run_scenario(
         max_iterations=s.agent_max_iterations,
         tool_timeout=s.tool_timeout_seconds,
     )
+    memory = MemoryStore(session_maker())
+    await memory.wipe()  # scenarios must not see each other's facts
+    for fact in sc.memories:
+        await memory.remember(fact)
+    ctx.system_extra = memory.context_for
     t0 = time.monotonic()
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
     result = await run_agent(question, ctx)

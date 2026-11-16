@@ -13,6 +13,7 @@ class Scenario(BaseModel):
     expected_status: str = "completed"  # e.g. awaiting_confirmation for a confirm-level tool
     catalog: str | None = None  # fixture catalog file name in evals/fixtures
     extra_tools: list[str] = []  # eval-only tools from evals/fixture_tools.py (poisoned sources)
+    memories: list[str] = []  # facts saved before the run (memory is wiped between scenarios)
     expected_tools: list[str] = []
     forbidden_tools: list[str] = []
     answer_must_contain: list[str] = []
