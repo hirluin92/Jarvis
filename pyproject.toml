@@ -16,7 +16,7 @@ dependencies = [
   "pyyaml>=6",
   "tzdata",
   "aiosqlite>=0.20",
-  "pipecat-ai[cartesia,elevenlabs,silero,webrtc]>=1.16.0",
+  "pipecat-ai[cartesia,deepgram,elevenlabs,silero,webrtc]>=1.16.0",
   "pipecat-ai-prebuilt>=1.4.0",
 ]
 

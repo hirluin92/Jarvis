@@ -202,9 +202,12 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
     from pipecat.turns.user_turn_strategies import UserTurnStrategies
     from pipecat.workers.runner import WorkerRunner
 
-    if settings.stt_provider != "elevenlabs" or settings.tts_provider != "cartesia":
+    if (
+        settings.stt_provider not in ("elevenlabs", "deepgram")
+        or settings.tts_provider != "cartesia"
+    ):
         raise ValueError(
-            "real-time voice supports STT_PROVIDER=elevenlabs and TTS_PROVIDER=cartesia"
+            "real-time voice supports STT_PROVIDER=elevenlabs|deepgram and TTS_PROVIDER=cartesia"
         )
 
     state = {"clock": None}  # the turn in progress
@@ -247,12 +250,22 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
         webrtc_connection=connection,
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     )
-    stt = ElevenLabsRealtimeSTTService(
-        api_key=settings.elevenlabs_api_key,
-        settings=ElevenLabsRealtimeSTTService.Settings(
-            model="scribe_v2_realtime", language=Language.IT, keyterms=keyterms(settings)
-        ),
-    )
+    if settings.stt_provider == "deepgram":
+        from pipecat.services.deepgram.stt import DeepgramSTTService
+
+        stt = DeepgramSTTService(
+            api_key=settings.deepgram_api_key,
+            settings=DeepgramSTTService.Settings(
+                model="nova-3", language=Language.IT, keyterm=keyterms(settings), smart_format=True
+            ),
+        )
+    else:
+        stt = ElevenLabsRealtimeSTTService(
+            api_key=settings.elevenlabs_api_key,
+            settings=ElevenLabsRealtimeSTTService.Settings(
+                model="scribe_v2_realtime", language=Language.IT, keyterms=keyterms(settings)
+            ),
+        )
     tts = CartesiaTTSService(
         api_key=settings.cartesia_api_key,
         settings=CartesiaTTSService.Settings(

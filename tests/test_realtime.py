@@ -462,7 +462,7 @@ def test_realtime_voice_refuses_providers_it_does_not_support():
 
     from app.voice.realtime import build_session
 
-    settings = SimpleNamespace(stt_provider="deepgram", tts_provider="cartesia")
+    settings = SimpleNamespace(stt_provider="cartesia", tts_provider="cartesia")
 
     async def noop(*a, **k): ...
 
@@ -471,5 +471,5 @@ def test_realtime_voice_refuses_providers_it_does_not_support():
             SmallWebRTCConnection(ice_servers=None), settings, VoiceTurnHandler(noop, None, noop)
         )
 
-    with pytest.raises(ValueError, match="STT_PROVIDER=elevenlabs"):
+    with pytest.raises(ValueError, match="STT_PROVIDER=elevenlabs|deepgram"):
         asyncio.run(build())
