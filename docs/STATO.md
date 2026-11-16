@@ -69,4 +69,25 @@ configurabile), comando `/report`, 8 scenari di eval (`report_*`).
 Note: il repo `hirluin92/Jarvis` su GitHub è vuoto (nessun push): il report vede 0 commit.
 GitHub risponde 409 sui commit di un repo vuoto: ora gestito come 0 commit, non come errore.
 
-Le fasi 3-7 NON sono iniziate.
+## Fase 3 — Eval e osservabilità: IN CORSO (2026-11-16)
+
+Nota di processo: la fase 3 è stata avviata senza che il criterio 1 della fase 2 (3 giorni di
+report di fila) fosse chiuso, su richiesta esplicita di Gianluca. Quel criterio resta aperto.
+
+Implementato: costo stimato per run (prezzi in `app/costs.py`, da `claude-api`: Sonnet 5.5
+$2/$10 per Mtok) con riga di riepilogo 24h nel report e in `/last`; pagina web `/ui/runs` e
+`/ui/runs/{id}`; `/bad` (colonna `runs.marked_bad`, migrazione 0002, bozze in
+`evals/scenarios/drafts/`); eval con giudice (`rubric` + `min_score`), stato atteso,
+confronto con l'esecuzione precedente (`evals/results/`, ignorata da git) e tetto di spesa
+`--max-cost`; workflow `.github/workflows/ci.yml`.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Una PR che peggiora uno scenario viene bloccata dalla CI | DA VERIFICARE: il workflow esiste ma richiede push su GitHub, secret `ANTHROPIC_API_KEY` e `GH_READ_TOKEN`, e il controllo "CI" reso obbligatorio nelle impostazioni del branch |
+| 2 | `/bad` produce uno scenario valido in meno di un minuto | PASS nei test (la bozza passa la stessa validazione degli scenari); da provare su Telegram |
+| 3 | Di ogni run: passaggi, durata, token, costo stimato | PASS (pagina `/ui/runs/{id}`, verificata sul server vero) |
+| 4 | Almeno 25 scenari, meno di 5 minuti | PASS: 27 scenari, 105 s, circa $0.17 per esecuzione, tutti PASS |
+
+Limite noto: i secret GitHub non possono chiamarsi `GITHUB_*`, quindi il secret è `GH_READ_TOKEN`.
+
+Le fasi 4-7 NON sono iniziate.
