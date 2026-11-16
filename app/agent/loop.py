@@ -61,6 +61,8 @@ class AgentContext:
     summary_threshold: int | None = None  # summarise when history grows beyond this many messages
     keep_recent: int = 12  # messages kept verbatim after a summary
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # one run at a time per conversation
+    background: set[asyncio.Task] = field(default_factory=set)  # e.g. a summary being written
+    summarizing: bool = False
 
 
 def _trim(history: list[dict[str, Any]], limit: int) -> None:
@@ -233,42 +235,61 @@ def _is_user_text(m: dict[str, Any]) -> bool:
     return m["role"] == "user" and isinstance(m["content"], str)
 
 
-async def _maybe_summarize(ctx: AgentContext) -> None:
-    """Fold the older part of a long conversation into ctx.summary (the call is traced)."""
+def _schedule_summary(ctx: AgentContext) -> None:
+    """Summarise a long conversation in the background: it must never delay the answer, nor the
+    next turn (the summary call takes seconds)."""
     limit = ctx.summary_threshold
-    if limit is None or len(ctx.history) <= limit:
+    if limit is None or len(ctx.history) <= limit or ctx.summarizing:
         return
-    cut = len(ctx.history) - ctx.keep_recent
-    while cut < len(ctx.history) and not _is_user_text(ctx.history[cut]):
-        cut += 1  # keep a clean start: the kept part must begin at a user message
-    if cut <= 0 or cut >= len(ctx.history):
-        return
-    run_id = await ctx.tracer.start_run("[summary]", ctx.llm.model)
-    t0 = time.monotonic()
-    prompt = (
-        f"Previous summary:\n{ctx.summary or '(none)'}\n\n"
-        f"Conversation to fold in:\n{_render(ctx.history[:cut])}"
-    )
+    ctx.summarizing = True  # set now, not when the task starts: no second summary in between
+    task = asyncio.create_task(_summarize(ctx))
+    ctx.background.add(task)
+    task.add_done_callback(ctx.background.discard)
+
+
+async def _summarize(ctx: AgentContext) -> None:
+    """Fold the older part of the conversation into ctx.summary (the call is traced).
+
+    The model call runs outside the conversation lock, on a snapshot; the result is applied under
+    the lock only if the part being folded is still exactly what was summarised."""
     try:
-        resp = await ctx.llm.complete(SUMMARY_SYSTEM, [{"role": "user", "content": prompt}], [])
-    except Exception as e:
-        await ctx.tracer.finish_run(run_id, "failed", f"{type(e).__name__}: {e}", 0, 0)
-        log.exception("summary failed; the history limit still bounds the conversation")
-        return
-    await ctx.tracer.add_step(
-        run_id,
-        0,
-        "llm_call",
-        output={"text": resp.text},
-        duration_ms=int((time.monotonic() - t0) * 1000),
-        input_tokens=resp.input_tokens,
-        output_tokens=resp.output_tokens,
-    )
-    await ctx.tracer.finish_run(
-        run_id, "completed", resp.text, resp.input_tokens, resp.output_tokens
-    )
-    ctx.summary = resp.text.strip()
-    del ctx.history[:cut]
+        cut = len(ctx.history) - ctx.keep_recent
+        while cut < len(ctx.history) and not _is_user_text(ctx.history[cut]):
+            cut += 1  # keep a clean start: the kept part must begin at a user message
+        if cut <= 0 or cut >= len(ctx.history):
+            return
+        snapshot = list(ctx.history[:cut])
+        run_id = await ctx.tracer.start_run("[summary]", ctx.llm.model)
+        t0 = time.monotonic()
+        prompt = (
+            f"Previous summary:\n{ctx.summary or '(none)'}\n\n"
+            f"Conversation to fold in:\n{_render(snapshot)}"
+        )
+        try:
+            resp = await ctx.llm.complete(SUMMARY_SYSTEM, [{"role": "user", "content": prompt}], [])
+        except Exception as e:
+            await ctx.tracer.finish_run(run_id, "failed", f"{type(e).__name__}: {e}", 0, 0)
+            log.exception("summary failed; the history limit still bounds the conversation")
+            return
+        await ctx.tracer.add_step(
+            run_id,
+            0,
+            "llm_call",
+            output={"text": resp.text},
+            duration_ms=int((time.monotonic() - t0) * 1000),
+            input_tokens=resp.input_tokens,
+            output_tokens=resp.output_tokens,
+        )
+        await ctx.tracer.finish_run(
+            run_id, "completed", resp.text, resp.input_tokens, resp.output_tokens
+        )
+        async with ctx.lock:
+            if ctx.history[:cut] == snapshot:  # nothing before the cut changed meanwhile
+                ctx.summary = resp.text.strip()
+                del ctx.history[:cut]
+                await _persist(ctx)
+    finally:
+        ctx.summarizing = False
 
 
 async def _persist(ctx: AgentContext) -> None:
@@ -314,7 +335,7 @@ async def _run_agent(
         await context.tracer.finish_run(run_id, "failed", f"{type(e).__name__}: {e}", 0, 0)
         return AgentResult(run_id, "failed", "Errore interno durante l'elaborazione.")
     _trim(context.history, context.history_limit)
-    await _maybe_summarize(context)
+    _schedule_summary(context)
     await _persist(context)
     return result
 

@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -278,11 +279,52 @@ async def test_long_conversation_is_summarised_and_the_summary_is_used(tracer, m
         await run_agent(f"messaggio {n}", ctx)  # 6 messages: not over the threshold yet
     assert ctx.summary == ""
     await run_agent("messaggio 3", ctx)  # 8 messages: folds the oldest into a summary
+    await asyncio.gather(*ctx.background)  # the summary is written in the background
     assert ctx.summary.startswith("L'utente si chiama Anna")
     assert len(ctx.history) == 2 and ctx.history[0]["content"] == "messaggio 3"
     assert "[summary]" in [r.user_message for r in await tracer.list_runs()]
     await run_agent("messaggio 4", ctx)
     assert "L'utente si chiama Anna" in llm.systems[-1]  # the summary reaches the next prompt
+
+
+async def test_the_answer_does_not_wait_for_the_summary(tracer, make_ctx):
+    release = asyncio.Event()
+
+    class SlowSummary(FakeLLMClient):
+        async def complete(self, system, messages, tools, on_text=None):
+            if system.startswith("Summarise"):
+                await release.wait()  # the summary call takes seconds
+            return await super().complete(system, messages, tools, on_text)
+
+    replies = [LLMResponse(text="r")] * 2 + [LLMResponse(text="Riassunto breve.")]
+    ctx = make_ctx(SlowSummary(replies), summary_threshold=2, keep_recent=2)
+    await run_agent("uno", ctx)
+    result = await asyncio.wait_for(run_agent("due", ctx), timeout=1)  # not blocked by it
+    assert result.status == "completed" and ctx.summary == ""  # still being written
+    assert ctx.summarizing is True
+    release.set()
+    await asyncio.gather(*ctx.background)
+    assert ctx.summary == "Riassunto breve." and ctx.summarizing is False
+
+
+async def test_a_summary_is_dropped_if_the_conversation_changed_meanwhile(tracer, make_ctx):
+    release = asyncio.Event()
+
+    class SlowSummary(FakeLLMClient):
+        async def complete(self, system, messages, tools, on_text=None):
+            if system.startswith("Summarise"):
+                await release.wait()
+            return await super().complete(system, messages, tools, on_text)
+
+    replies = [LLMResponse(text="r")] * 2 + [LLMResponse(text="Riassunto.")]
+    ctx = make_ctx(SlowSummary(replies), summary_threshold=2, keep_recent=2)
+    await run_agent("uno", ctx)
+    await run_agent("due", ctx)  # starts a summary of the first turn
+    await asyncio.sleep(0.05)  # let it take its snapshot and reach the (slow) model call
+    ctx.history[0] = {"role": "user", "content": "modificato"}  # e.g. history trimmed elsewhere
+    release.set()
+    await asyncio.gather(*ctx.background)
+    assert ctx.summary == ""  # the stale summary was discarded, nothing was lost
 
 
 async def test_a_failing_summary_does_not_break_the_conversation(tracer, make_ctx):
@@ -296,6 +338,7 @@ async def test_a_failing_summary_does_not_break_the_conversation(tracer, make_ct
     for n in range(3):
         result = await run_agent(f"m{n}", ctx)
         assert result.status == "completed"
+        await asyncio.gather(*ctx.background)
     assert ctx.summary == ""
 
 

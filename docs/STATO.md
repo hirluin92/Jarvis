@@ -258,6 +258,18 @@ e correzioni:
   della chat: Jarvis li ripeteva ("il dato salvato è sempre il dottor Bianchi"). Ora ogni richiesta
   porta un avviso con i fatti dimenticati di recente (massimo 10): "non usarli nemmeno se
   compaiono prima nella conversazione".
-Da misurare di nuovo dal vivo (criteri 2 e 3), in particolare una domanda senza tool.
+Terza prova dal vivo (6 turni): domande senza tool a 1,22-1,23 s dal rilevamento della fine
+del turno, con tool a 1,8-1,9 s. Il rilevatore di voce aspetta 0,2 s di silenzio prima di
+dichiarare la fine: percepiti circa 1,4 s senza tool (appena sotto l'obiettivo di 1,5 s). Un turno
+a 5,3 s aveva una causa trovata nel trace: il riassunto automatico (4,15 s) girava dentro
+`run_agent` e tratteneva l'ultima frase. Correzioni: il riassunto ora gira in background fuori
+dal blocco della conversazione (e viene scartato se la parte riassunta è cambiata nel
+frattempo); ogni risposta del modello termina con un marcatore che libera subito l'ultima frase.
+Problemi di ascolto segnalati dall'utente ("che ore sono a Tokyo" spesso non capito): nei 16 turni
+tracciati la frase è giusta 7 volte; errori veri ("Quiore sono a Tokyo") e frasi spezzate in due
+turni ("Che ore sono attualmente?" poi "A Tokyo."), perché 0,2 s di silenzio bastano a chiudere il
+turno. Correzioni: modello "smart turn" di Pipecat per capire se la frase è finita davvero
+(`TurnAnalyzerUserTurnStopStrategy`) e parole chiave per la trascrizione (`STT_KEYTERMS`).
+Effetto sull'errore di attacco ("Quiore") non garantito: da misurare dal vivo (criteri 2 e 3).
 
 La fase 7 NON è iniziata.

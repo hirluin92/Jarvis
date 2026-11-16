@@ -82,6 +82,13 @@ async def test_a_sentence_is_handed_over_as_soon_as_it_is_complete():
     assert said == ["Sono le sette e quarantuno."]  # the rest is still being written
 
 
+async def test_the_end_of_reply_marker_releases_the_last_sentence_at_once():
+    # the model client ends each reply with a line break: the last sentence need not wait for
+    # the run (tools, trace, summary) to finish before it is spoken
+    said, _ = await _feed(["Mi chiamo Jarvis, sono il tuo assistente.", "\n"], tail=False)
+    assert said == ["Mi chiamo Jarvis, sono il tuo assistente."]
+
+
 async def test_the_unfinished_tail_is_spoken_at_the_end():
     said, s = await _feed(["Prima frase completa. ", "E poi il finale"])
     assert said == ["Prima frase completa.", "E poi il finale"] and s.spoken
@@ -416,6 +423,18 @@ async def test_voice_endpoints_delegate_to_the_sessions_when_on():
 
 
 # ---- the real pipeline can be built ----
+
+
+def test_keyterms_come_from_settings_and_can_be_empty():
+    from app.voice.realtime import keyterms
+
+    assert keyterms(SimpleNamespace(stt_keyterms="Jarvis, annulla ,,che ore sono")) == [
+        "Jarvis",
+        "annulla",
+        "che ore sono",
+    ]
+    assert keyterms(SimpleNamespace(stt_keyterms="")) is None
+    assert keyterms(SimpleNamespace()) is None
 
 
 def test_the_real_pipeline_builds_with_the_expected_stages():

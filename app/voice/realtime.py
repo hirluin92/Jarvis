@@ -82,6 +82,12 @@ class Sentencer:
             await self._say(said)
 
 
+def keyterms(settings: Any) -> list[str] | None:
+    """Words and phrases the transcription should favour (STT_KEYTERMS, comma separated)."""
+    terms = [t.strip() for t in str(getattr(settings, "stt_keyterms", "")).split(",") if t.strip()]
+    return terms or None
+
+
 def turn_text(frame: Any) -> str | None:
     """The user's text carried by a context frame, or None when it must not be answered.
 
@@ -171,6 +177,7 @@ class VoiceTurnHandler:
 def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> tuple[Any, Any]:
     """The Pipecat pipeline of one browser session: audio in -> transcript -> turns -> agent ->
     voice -> audio out. Returns (task, runner)."""
+    from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
     from pipecat.audio.vad.silero import SileroVADAnalyzer
     from pipecat.frames.frames import (
         LLMContextFrame,
@@ -191,6 +198,8 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
     from pipecat.transcriptions.language import Language
     from pipecat.transports.base_transport import TransportParams
     from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+    from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+    from pipecat.turns.user_turn_strategies import UserTurnStrategies
     from pipecat.workers.runner import WorkerRunner
 
     if settings.stt_provider != "elevenlabs" or settings.tts_provider != "cartesia":
@@ -241,7 +250,7 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
     stt = ElevenLabsRealtimeSTTService(
         api_key=settings.elevenlabs_api_key,
         settings=ElevenLabsRealtimeSTTService.Settings(
-            model="scribe_v2_realtime", language=Language.IT
+            model="scribe_v2_realtime", language=Language.IT, keyterms=keyterms(settings)
         ),
     )
     tts = CartesiaTTSService(
@@ -250,8 +259,15 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
             model=settings.tts_model, voice=settings.tts_voice, language="it"
         ),
     )
+    # end of turn: the voice detector says when sound stops, a small model (bundled with Pipecat)
+    # says whether the sentence is really over, so a pause mid-sentence does not split the request
+    turn_stop = TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())
     aggregators = LLMContextAggregatorPair(
-        LLMContext(), user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer())
+        LLMContext(),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+            user_turn_strategies=UserTurnStrategies(stop=[turn_stop]),
+        ),
     )
     pipeline = Pipeline(
         [

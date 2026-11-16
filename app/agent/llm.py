@@ -63,6 +63,7 @@ class AnthropicClient:
                 async for piece in stream.text_stream:
                     await on_text(piece)
                 r = await stream.get_final_message()
+            await on_text("\n")  # end of this reply: lets a listener release its last sentence
         out = LLMResponse(
             input_tokens=r.usage.input_tokens, output_tokens=r.usage.output_tokens, model=self.model
         )
@@ -135,4 +136,5 @@ class FakeLLMClient:
             for i in range(0, len(words), 3):
                 tail = " " if i + 3 < len(words) else ""
                 await on_text(" ".join(words[i : i + 3]) + tail)
+            await on_text("\n")  # same end-of-reply marker as the real client
         return resp

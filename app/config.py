@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # real-time voice (web page + Pipecat). Off by default: it opens a microphone endpoint.
     realtime_voice: bool = False
     fast_model: str = "claude-haiku-5-5"  # answers simple spoken requests first
+    # words the real-time transcription should favour (comma separated)
+    stt_keyterms: str = "Jarvis,annulla,conferma,Telegram,GitHub,Gmail,promemoria,che ore sono"
     # voice: providers are chosen here, not in code (see docs/voce-benchmark.md)
     stt_provider: str = "elevenlabs"  # elevenlabs | deepgram | cartesia
     tts_provider: str = "cartesia"  # cartesia | elevenlabs
