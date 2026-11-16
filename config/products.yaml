@@ -1,0 +1,7 @@
+# Catalog of the products the morning report monitors.
+# To add a product, append an entry: no code changes needed.
+products:
+  - name: Jarvis
+    urls:
+      - http://127.0.0.1:8000/health
+    github_repo: hirluin92/Jarvis

@@ -1,3 +1,4 @@
+from datetime import time
 from functools import lru_cache
 from typing import Annotated
 
@@ -15,6 +16,10 @@ class Settings(BaseSettings):
     telegram_allowed_user_ids: Annotated[list[int], NoDecode] = []
     agent_max_iterations: int = 8
     tool_timeout_seconds: float = 30
+    github_read_token: str = ""
+    products_file: str = "config/products.yaml"
+    report_time: time = time(7, 30)
+    report_timezone: str = "Europe/Rome"
 
     @field_validator("telegram_allowed_user_ids", mode="before")
     @classmethod
