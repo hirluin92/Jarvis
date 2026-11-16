@@ -20,6 +20,7 @@ from app.agent.loop import (
     resume_confirmed,
     run_agent,
 )
+from app.report import generate_report
 from app.tracing import Tracer
 
 log = logging.getLogger("jarvis.telegram")
@@ -99,6 +100,16 @@ def build_handlers(state: BotState) -> list:
             f"Durata: {dur} ms\nToken: {run.input_tokens} in / {run.output_tokens} out"
         )
 
+    async def report(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        typing = asyncio.create_task(_typing(update))
+        try:
+            result = await generate_report(state.make_context())
+        finally:
+            typing.cancel()
+        await _reply(update, state, result)
+
     async def on_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update) or not update.effective_message.text:
             return
@@ -138,6 +149,7 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("start", start),
         CommandHandler("reset", reset),
         CommandHandler("last", last),
+        CommandHandler("report", report),
         CallbackQueryHandler(on_button),
         MessageHandler(filters.TEXT & ~filters.COMMAND, on_text),
     ]

@@ -1,4 +1,6 @@
+import asyncio
 from contextlib import asynccontextmanager
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
@@ -8,6 +10,8 @@ from app.agent.loop import AgentContext
 from app.config import get_settings
 from app.db import session as db
 from app.interfaces.telegram import BotState, build_application
+from app.report import generate_report
+from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
 
@@ -66,7 +70,22 @@ async def lifespan(app: FastAPI):
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
+
+    async def send_report(text: str) -> None:
+        for user_id in s.telegram_allowed_user_ids:
+            await bot.bot.send_message(chat_id=user_id, text=text)
+
+    async def produce_report() -> str:
+        result = await generate_report(make_context())
+        if result.status != "completed":
+            raise RuntimeError(f"run {result.run_id} ended with status {result.status}")
+        return result.answer
+
+    report_task = asyncio.create_task(
+        daily_report_loop(produce_report, send_report, s.report_time, ZoneInfo(s.report_timezone))
+    )
     yield
+    report_task.cancel()
     await bot.updater.stop()
     await bot.stop()
     await bot.shutdown()
