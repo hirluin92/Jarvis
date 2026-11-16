@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # words the real-time transcription should favour (comma separated)
     stt_keyterms: str = "Jarvis,annulla,conferma,Telegram,GitHub,Gmail,promemoria,che ore sono"
     # voice: providers are chosen here, not in code (see docs/voce-benchmark.md)
-    stt_provider: str = "elevenlabs"  # elevenlabs | deepgram | cartesia
+    stt_provider: str = "deepgram"  # elevenlabs | deepgram | cartesia
     tts_provider: str = "cartesia"  # cartesia | elevenlabs
     tts_voice: str = "ee16f140-f6dc-490e-a1ed-c1d537ea0086"  # Cartesia "Lorenzo", Italian
     tts_model: str = "sonic-3.6"

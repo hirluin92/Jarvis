@@ -270,6 +270,9 @@ tracciati la frase è giusta 7 volte; errori veri ("Quiore sono a Tokyo") e fras
 turni ("Che ore sono attualmente?" poi "A Tokyo."), perché 0,2 s di silenzio bastano a chiudere il
 turno. Correzioni: modello "smart turn" di Pipecat per capire se la frase è finita davvero
 (`TurnAnalyzerUserTurnStopStrategy`) e parole chiave per la trascrizione (`STT_KEYTERMS`).
+Verifica dal vivo (16 nov): con ElevenLabs la frase "Che ore sono a Tokyo?" veniva capita 7 volte su 16;
+passando a Deepgram nova-3 (`STT_PROVIDER=deepgram`, ora il default) 3 su 3 corrette più "Che ore sono a Roma?",
+risposta veloce secondo l'utente. ElevenLabs resta selezionabile da `.env`.
 Effetto sull'errore di attacco ("Quiore") non garantito: da misurare dal vivo (criteri 2 e 3).
 
 La fase 7 NON è iniziata.
