@@ -237,7 +237,15 @@ Limiti noti: dal telefono serve HTTPS (i browser bloccano il microfono su pagine
 tranne localhost); si fa con la rete privata della fase 7. Nessuna autenticazione sulle rotte:
 va bene finché il server ascolta solo in locale, da aggiungere prima di esporlo.
 
-Da fare: provarlo dal vivo (criteri 2 e 3 sulla latenza e l'interruzione), poi eventuale
-streaming dei token dell'agente alla voce se serve stare sotto 1,5 s.
+Prima prova dal vivo (2026-11-16, 3 turni parlati): funziona, ma i tempi erano 1,9 / 3,6 / 3,75 s
+contro l'obiettivo di 1,5 s (trascrizione 0,2 s e voce 0,1 s; il resto era l'agente), e un turno
+ha dato un'ora sbagliata di 16 minuti senza chiamare `get_current_time`. Correzioni:
+- Il prompt di sistema ora vieta di conoscere ora e data a memoria; 3 scenari di eval instradati
+  (`voice_time_*`) lo verificano con il router vero.
+- Streaming: il modello scrive in streaming e la voce parte sulla prima frase (`Sentencer`),
+  mentre il resto è ancora in scrittura. La latenza ora registra anche `agent_s` (fino alle
+  prime parole) e `reply_done_s` (risposta intera).
+- Il passo di trace `llm_call` dice quale modello ha scritto la risposta (`model`).
+Da misurare di nuovo dal vivo dopo queste correzioni (criteri 2 e 3).
 
 La fase 7 NON è iniziata.

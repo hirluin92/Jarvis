@@ -15,6 +15,7 @@ from app.tools.registry import Tool, ToolRegistry
 from app.voice.realtime import (
     LATENCY_STEP_IDX,
     PENDING_SPEECH,
+    Sentencer,
     TurnClock,
     VoiceTurnHandler,
     turn_text,
@@ -52,11 +53,55 @@ def test_a_speculative_turn_is_never_answered():
 
 
 def test_clock_breaks_the_wait_into_stages():
-    c = TurnClock(speech_end=10.0, heard=10.4, answered=11.1, first_audio=11.3)
+    c = TurnClock(speech_end=10.0, heard=10.4, first_text=10.9, answered=11.6, first_audio=11.1)
     assert c.as_dict() == {
-        "transcript_s": 0.4, "agent_s": 0.7, "voice_s": 0.2, "total_s": 1.3,
+        "transcript_s": 0.4, "agent_s": 0.5, "voice_s": 0.2, "total_s": 1.1, "reply_done_s": 1.2,
     }  # fmt: skip
     assert TurnClock(speech_end=1.0).as_dict()["total_s"] is None  # unfinished turn
+
+
+# ---- cutting the streamed reply into sentences ----
+
+
+async def _feed(pieces, stale=lambda: False, tail=True):
+    said = []
+
+    async def say(s):
+        said.append(s)
+
+    sentencer = Sentencer(say, stale)
+    for piece in pieces:
+        await sentencer.feed(piece)
+    if tail:
+        await sentencer.flush()
+    return said, sentencer
+
+
+async def test_a_sentence_is_handed_over_as_soon_as_it_is_complete():
+    said, _ = await _feed(["Sono le sette ", "e quarantuno. ", "Buona ", "serata."], tail=False)
+    assert said == ["Sono le sette e quarantuno."]  # the rest is still being written
+
+
+async def test_the_unfinished_tail_is_spoken_at_the_end():
+    said, s = await _feed(["Prima frase completa. ", "E poi il finale"])
+    assert said == ["Prima frase completa.", "E poi il finale"] and s.spoken
+
+
+async def test_numbers_and_short_fragments_do_not_split_a_sentence():
+    said, _ = await _feed(["Sono le 17.41 di sera, ok. Vuoi altro?"])
+    assert said == ["Sono le 17.41 di sera, ok.", "Vuoi altro?"]
+    said, _ = await _feed(["Ok. Ho salvato il fatto che mi hai detto."])
+    assert said == ["Ok. Ho salvato il fatto che mi hai detto."]  # "Ok." alone is too short
+
+
+async def test_markdown_is_removed_from_each_sentence():
+    said, _ = await _feed(["**Fatto** il lavoro. Vedi https://x.it per altro."])
+    assert said == ["Fatto il lavoro.", "Vedi un link per altro."]
+
+
+async def test_nothing_is_spoken_once_the_turn_is_interrupted():
+    said, s = await _feed(["Una frase lunga abbastanza. ", "Un'altra frase."], stale=lambda: True)
+    assert said == [] and not s.spoken
 
 
 # ---- the handler: one spoken turn through the agent ----
@@ -71,19 +116,62 @@ def _handler(make_ctx, llm, notify=None, registry=None, routed=None):
     return VoiceTurnHandler(get_ctx, routed, notify or AsyncMock()), ctx
 
 
+def _say_into(said):
+    async def say(sentence):
+        said.append(sentence)
+
+    return say
+
+
 async def test_the_answer_is_spoken_plain_and_asked_in_the_spoken_style(tracer, make_ctx):
     llm = FakeLLMClient([LLMResponse(text="Sono le **17:17**. Vedi https://x.it")])
     handler, _ = _handler(make_ctx, llm)
-    say = await handler.respond("che ore sono?", TurnClock())
-    assert say == "Sono le 17:17. Vedi un link"
+    said = []
+    await handler.respond("che ore sono?", TurnClock(), _say_into(said))
+    assert said == ["Sono le 17:17.", "Vedi un link"]
     assert VOICE_STYLE in llm.systems[0]
+
+
+async def test_a_model_that_does_not_stream_is_still_spoken(tracer, make_ctx):
+    class Silent(FakeLLMClient):
+        async def complete(self, system, messages, tools, on_text=None):
+            return await super().complete(system, messages, tools)  # never calls on_text
+
+    handler, _ = _handler(make_ctx, Silent([LLMResponse(text="Risposta intera.")]))
+    said = []
+    await handler.respond("ciao", TurnClock(), _say_into(said))
+    assert said == ["Risposta intera."]
+
+
+async def test_the_first_sentence_is_spoken_before_the_model_has_finished(tracer, make_ctx):
+    release = asyncio.Event()
+
+    class Streaming(FakeLLMClient):
+        async def complete(self, system, messages, tools, on_text=None):
+            await on_text("Questa è la prima frase. ")
+            await release.wait()  # the rest of the reply is still being written
+            await on_text("E questa la seconda.")
+            return LLMResponse(text="Questa è la prima frase. E questa la seconda.")
+
+    handler, _ = _handler(make_ctx, Streaming([]))
+    said, clock = [], TurnClock()
+    turn = asyncio.create_task(handler.respond("ciao", clock, _say_into(said)))
+    await asyncio.sleep(0.1)
+    assert said == ["Questa è la prima frase."] and clock.first_text is not None  # already out
+    assert not turn.done()
+    release.set()
+    await turn
+    assert said == ["Questa è la prima frase.", "E questa la seconda."]
+    assert clock.answered is not None and clock.answered >= clock.first_text
 
 
 async def test_a_turn_can_use_a_different_model_without_touching_the_context(tracer, make_ctx):
     main, fast = FakeLLMClient([]), FakeLLMClient([LLMResponse(text="risposta veloce")])
     handler, ctx = _handler(make_ctx, main, routed=fast)
-    assert await handler.respond("ciao", TurnClock()) == "risposta veloce"
-    assert main.calls == [] and ctx.llm is main  # the override was for this turn only
+    said = []
+    await handler.respond("ciao", TurnClock(), _say_into(said))
+    assert said == ["risposta veloce"] and main.calls == []
+    assert ctx.llm is main  # the override was for this turn only
 
 
 async def test_a_confirmation_goes_to_telegram_and_is_only_announced_aloud(tracer, make_ctx):
@@ -104,8 +192,9 @@ async def test_a_confirmation_goes_to_telegram_and_is_only_announced_aloud(trace
         notified.append(result)
 
     handler, _ = _handler(make_ctx, llm, notify, registry)
-    say = await handler.respond("fai l'azione", TurnClock())
-    assert say == PENDING_SPEECH
+    said = []
+    await handler.respond("fai l'azione", TurnClock(), _say_into(said))
+    assert said == [PENDING_SPEECH]
     assert executed == []  # voice can never settle a confirm-level action
     assert len(notified) == 1 and notified[0].pending is not None
 
@@ -114,12 +203,13 @@ async def test_an_interrupted_turn_lets_the_agent_finish_and_speaks_nothing(trac
     gate = asyncio.Event()
 
     class Slow(FakeLLMClient):
-        async def complete(self, system, messages, tools):
+        async def complete(self, system, messages, tools, on_text=None):
             await gate.wait()
-            return await super().complete(system, messages, tools)
+            return await super().complete(system, messages, tools, on_text)
 
-    handler, ctx = _handler(make_ctx, Slow([LLMResponse(text="risposta tardiva")]))
-    turn = asyncio.create_task(handler.respond("domanda lunga", TurnClock()))
+    handler, ctx = _handler(make_ctx, Slow([LLMResponse(text="Una risposta tardiva e lunga.")]))
+    said = []
+    turn = asyncio.create_task(handler.respond("domanda lunga", TurnClock(), _say_into(said)))
     await asyncio.sleep(0.05)
     turn.cancel()  # the user started talking again
     with pytest.raises(asyncio.CancelledError):
@@ -127,14 +217,15 @@ async def test_an_interrupted_turn_lets_the_agent_finish_and_speaks_nothing(trac
     gate.set()
     await asyncio.sleep(0.1)
     (run,) = await tracer.list_runs()
-    assert run.status == "completed" and run.final_answer == "risposta tardiva"
+    assert run.status == "completed" and run.final_answer == "Una risposta tardiva e lunga."
     assert ctx.history[-1]["role"] == "assistant"  # the history stays consistent
+    assert said == []  # and the late reply is never spoken over the user
 
 
 async def test_latency_is_written_on_the_runs_trace(tracer, make_ctx):
     handler, _ = _handler(make_ctx, FakeLLMClient([LLMResponse(text="ok")]))
-    clock = TurnClock(speech_end=1.0, heard=1.3, answered=1.9, first_audio=2.0)
-    await handler.respond("ciao", clock)
+    clock = TurnClock(speech_end=1.0, heard=1.3, first_text=1.6, answered=1.9, first_audio=2.0)
+    await handler.respond("ciao", clock, _say_into([]))
     await handler.record_latency(clock)
     run = (await tracer.list_runs())[0]
     step = next(s for s in run.steps if s.type == "voice_latency")

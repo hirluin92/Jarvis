@@ -1,0 +1,11 @@
+name: voice_time_tokyo
+input: Che ore sono a Tokyo?
+expected_status: completed
+extra_tools: []
+memories: []
+routed: true
+expected_tools:
+- get_current_time
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7

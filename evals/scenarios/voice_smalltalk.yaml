@@ -1,0 +1,24 @@
+name: voice_smalltalk
+input: Ciao, come stai?
+expected_status: completed
+extra_tools: []
+memories: []
+routed: true
+expected_tools: []
+forbidden_tools:
+- get_current_time
+- http_health_check
+- echo_confirm_demo
+- site_status
+- github_activity
+- create_note
+- add_todo
+- create_github_issue
+- merge_pull_request
+- draft_email
+- send_email
+- remember
+- recall
+- forget
+answer_must_contain: []
+min_score: 0.7

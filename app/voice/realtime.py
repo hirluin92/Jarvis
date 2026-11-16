@@ -7,6 +7,7 @@ Confirmations (`confirm` tools) are never settled by voice: they go to Telegram 
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -32,7 +33,8 @@ class TurnClock:
 
     speech_end: float | None = None  # the user stopped talking (voice activity detector)
     heard: float | None = None  # the turn text was ready (final transcript + turn rules)
-    answered: float | None = None  # the agent finished
+    first_text: float | None = None  # the first sentence of the reply was ready to be spoken
+    answered: float | None = None  # the agent finished the whole reply
     first_audio: float | None = None  # the first sample of the reply reached the pipeline output
 
     def as_dict(self) -> dict[str, float | None]:
@@ -41,10 +43,43 @@ class TurnClock:
 
         return {
             "transcript_s": gap(self.speech_end, self.heard),
-            "agent_s": gap(self.heard, self.answered),
-            "voice_s": gap(self.answered, self.first_audio),
+            "agent_s": gap(self.heard, self.first_text),  # until the first words exist
+            "voice_s": gap(self.first_text, self.first_audio),
             "total_s": gap(self.speech_end, self.first_audio),  # what the user waits
+            "reply_done_s": gap(self.heard, self.answered),  # the whole reply, for reference
         }
+
+
+_SENTENCE_END = re.compile(r"[.!?…]+[\"»”)]*\s+")
+MIN_SENTENCE_CHARS = 12  # do not cut "Ok." or "dott." into a sentence of its own
+
+
+class Sentencer:
+    """Cuts the streamed reply into sentences and hands each one over as soon as it is complete,
+    so the voice starts on the first sentence while the rest is still being written."""
+
+    def __init__(self, say: Callable[[str], Awaitable[None]], is_stale: Callable[[], bool]) -> None:
+        self._say, self._is_stale = say, is_stale
+        self._buf = ""
+        self.spoken = False  # whether anything was handed to the voice
+
+    async def feed(self, piece: str) -> None:
+        self._buf += piece
+        while (m := _SENTENCE_END.search(self._buf, MIN_SENTENCE_CHARS)) is not None:
+            sentence, self._buf = self._buf[: m.end()], self._buf[m.end() :]
+            await self._speak(sentence)
+
+    async def flush(self) -> None:
+        rest, self._buf = self._buf, ""
+        await self._speak(rest)
+
+    async def _speak(self, text: str) -> None:
+        if self._is_stale():  # the user interrupted: a late sentence must not be spoken
+            return
+        said = speakable(text)
+        if said:
+            self.spoken = True
+            await self._say(said)
 
 
 def turn_text(frame: Any) -> str | None:
@@ -80,16 +115,30 @@ class VoiceTurnHandler:
         self.last_run_id: int | None = None
         self.last_tracer: Any = None
 
-    async def respond(self, text: str, clock: TurnClock) -> str | None:
-        """What to say aloud for this turn, or None. Raises CancelledError if interrupted."""
+    async def respond(
+        self, text: str, clock: TurnClock, say: Callable[[str], Awaitable[None]]
+    ) -> None:
+        """Answer one spoken turn, handing sentences to `say` as they are written.
+        Raises CancelledError if the user interrupted (nothing more is spoken then)."""
         ctx = await self._get_ctx()
         self.last_tracer = ctx.tracer
-        task = asyncio.create_task(run_agent(text, ctx, style=VOICE_STYLE, llm=self._llm))
+        interrupted = False
+
+        async def speak(sentence: str) -> None:
+            if clock.first_text is None:
+                clock.first_text = time.monotonic()
+            await say(sentence)
+
+        sentencer = Sentencer(speak, lambda: interrupted)
+        task = asyncio.create_task(
+            run_agent(text, ctx, style=VOICE_STYLE, llm=self._llm, on_text=sentencer.feed)
+        )
         try:
             # shielded: an interruption must not cut the agent mid-run (history, tools, trace);
-            # it finishes in the background and its answer is simply not spoken
+            # it finishes in the background and nothing it writes is spoken any more
             result = await asyncio.shield(task)
         except asyncio.CancelledError:
+            interrupted = True
             self._background.add(task)
             task.add_done_callback(self._background.discard)
             raise
@@ -97,8 +146,11 @@ class VoiceTurnHandler:
         self.last_run_id = result.run_id
         if result.pending:
             await self._notify_pending(result)  # buttons on Telegram, never a spoken yes
-            return PENDING_SPEECH
-        return speakable(result.answer) if result.answer else None
+            await speak(PENDING_SPEECH)
+            return
+        await sentencer.flush()
+        if not sentencer.spoken and result.answer:  # a model that did not stream
+            await speak(speakable(result.answer))
 
     async def record_latency(self, clock: TurnClock) -> None:
         """Write the latency breakdown of the turn on the run's trace."""
@@ -163,9 +215,11 @@ def build_session(connection: Any, settings: Any, handler: VoiceTurnHandler) -> 
                 clock = state["clock"] or TurnClock(speech_end=time.monotonic())
                 clock.heard = time.monotonic()
                 state["clock"] = clock
-                say = await handler.respond(text, clock)
-                if say:
-                    await self.push_frame(TTSSpeakFrame(say, append_to_context=False))
+
+                async def say(sentence: str) -> None:
+                    await self.push_frame(TTSSpeakFrame(sentence, append_to_context=False))
+
+                await handler.respond(text, clock, say)
             else:
                 await self.push_frame(frame, direction)
 

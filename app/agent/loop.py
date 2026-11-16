@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.agent.llm import LLMClient
+from app.agent.llm import LLMClient, TextSink
 from app.agent.prompts import SYSTEM_PROMPT
 from app.runtime import current_run_id
 from app.tools.registry import ToolInputError, ToolRegistry
@@ -104,10 +104,12 @@ async def _loop(
     max_iter: int,
     system: str,
     llm: LLMClient,
+    on_text: TextSink | None = None,
 ) -> AgentResult:
+    stream = {"on_text": on_text} if on_text is not None else {}  # only when someone listens
     for _ in range(max_iter):
         t0 = time.monotonic()
-        resp = await llm.complete(system, messages, ctx.registry.definitions())
+        resp = await llm.complete(system, messages, ctx.registry.definitions(), **stream)
         tokens[0] += resp.input_tokens
         tokens[1] += resp.output_tokens
         await ctx.tracer.add_step(
@@ -115,7 +117,11 @@ async def _loop(
             idx,
             "llm_call",
             input={"messages": len(messages)},
-            output={"text": resp.text, "tool_uses": [t.name for t in resp.tool_uses]},
+            output={
+                "text": resp.text,
+                "tool_uses": [t.name for t in resp.tool_uses],
+                "model": resp.model or llm.model,
+            },
             duration_ms=int((time.monotonic() - t0) * 1000),
             input_tokens=resp.input_tokens,
             output_tokens=resp.output_tokens,
@@ -279,18 +285,20 @@ async def run_agent(
     *,
     style: str = "",
     llm: LLMClient | None = None,
+    on_text: TextSink | None = None,
 ) -> AgentResult:
     """Run the agent on one message. `style` adds an answer-style instruction for this run only
-    (e.g. spoken replies); `llm` overrides the model for this run only (e.g. a fast router).
+    (e.g. spoken replies); `llm` overrides the model for this run only (e.g. a fast router);
+    `on_text` receives the model's text while it is written (so a voice can start early).
 
     Runs on the same conversation are serialised: Telegram and a voice session can share one.
     """
     async with context.lock:
-        return await _run_agent(user_message, context, style, llm or context.llm)
+        return await _run_agent(user_message, context, style, llm or context.llm, on_text)
 
 
 async def _run_agent(
-    user_message: str, context: AgentContext, style: str, llm: LLMClient
+    user_message: str, context: AgentContext, style: str, llm: LLMClient, on_text: TextSink | None
 ) -> AgentResult:
     run_id = await context.tracer.start_run(user_message, context.llm.model)
     current_run_id.set(run_id)
@@ -299,8 +307,9 @@ async def _run_agent(
     try:
         system = await _system_for(context, user_message, style)
         result = await _loop(
-            context, run_id, context.history, 0, [0, 0], context.max_iterations, system, llm
-        )
+            context, run_id, context.history, 0, [0, 0], context.max_iterations, system, llm,
+            on_text,
+        )  # fmt: skip
     except Exception as e:
         await context.tracer.finish_run(run_id, "failed", f"{type(e).__name__}: {e}", 0, 0)
         return AgentResult(run_id, "failed", "Errore interno durante l'elaborazione.")

@@ -14,6 +14,7 @@ class Scenario(BaseModel):
     catalog: str | None = None  # fixture catalog file name in evals/fixtures
     extra_tools: list[str] = []  # eval-only tools from evals/fixture_tools.py (poisoned sources)
     memories: list[str] = []  # facts saved before the run (memory is wiped between scenarios)
+    routed: bool = False  # run as a spoken request through the fast-model router (voice path)
     expected_tools: list[str] = []
     forbidden_tools: list[str] = []
     answer_must_contain: list[str] = []

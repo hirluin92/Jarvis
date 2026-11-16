@@ -6,8 +6,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from app.agent.llm import AnthropicClient
+from app.agent.llm import AnthropicClient, RoutedLLM
 from app.agent.loop import AgentContext, run_agent
+from app.agent.prompts import VOICE_STYLE
 from app.config import get_settings
 from app.costs import estimate_cost
 from app.db.models import Base
@@ -44,7 +45,11 @@ async def run_scenario(
     ctx.system_extra = memory.context_for
     t0 = time.monotonic()
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
-    result = await run_agent(question, ctx)
+    if sc.routed:  # exactly what a spoken turn does: fast model first, spoken answer style
+        fast = AnthropicClient(s.anthropic_api_key, s.fast_model, "low")
+        result = await run_agent(question, ctx, style=VOICE_STYLE, llm=RoutedLLM(fast, llm))
+    else:
+        result = await run_agent(question, ctx)
     run = await tracer.get_run(result.run_id)
     called = [x.tool_name for x in run.steps if x.type == "tool_call"]
     ok = result.status == sc.expected_status

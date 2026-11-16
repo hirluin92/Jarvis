@@ -1,5 +1,8 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+
+TextSink = Callable[[str], Awaitable[None]]  # receives the model's text as it is written
 
 
 @dataclass
@@ -15,6 +18,7 @@ class LLMResponse:
     tool_uses: list[ToolUse] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
+    model: str = ""  # which model actually produced this (matters with latency routing)
 
     def to_assistant_content(self) -> list[dict[str, Any]]:
         blocks: list[dict[str, Any]] = []
@@ -43,16 +47,25 @@ class AnthropicClient:
         self.model = model
         self._effort = effort  # "low" trades some depth for speed (voice fast path)
 
-    async def complete(self, system, messages, tools) -> LLMResponse:
+    async def complete(self, system, messages, tools, on_text: TextSink | None = None):
+        """One model call. With `on_text` the reply is streamed and every piece of text is
+        handed over as soon as it arrives (so a voice can start speaking before it is done)."""
         kwargs: dict[str, Any] = {}
         if tools:
             kwargs["tools"] = tools
         if self._effort:
             kwargs["output_config"] = {"effort": self._effort}
-        r = await self._client.messages.create(
-            model=self.model, max_tokens=2048, system=system, messages=messages, **kwargs
+        params = dict(model=self.model, max_tokens=2048, system=system, messages=messages, **kwargs)
+        if on_text is None:
+            r = await self._client.messages.create(**params)
+        else:
+            async with self._client.messages.stream(**params) as stream:
+                async for piece in stream.text_stream:
+                    await on_text(piece)
+                r = await stream.get_final_message()
+        out = LLMResponse(
+            input_tokens=r.usage.input_tokens, output_tokens=r.usage.output_tokens, model=self.model
         )
-        out = LLMResponse(input_tokens=r.usage.input_tokens, output_tokens=r.usage.output_tokens)
         for b in r.content:
             if b.type == "text":
                 out.text += b.text
@@ -66,21 +79,23 @@ class RoutedLLM:
     is needed or after tool results (reasoning). Simple questions never wait for the big model.
 
     `model` is the main model's, which is what the run is billed against in the trace; the
-    fast attempt that escalates is discarded and its (small) tokens are not counted.
+    fast attempt that escalates is discarded and its (small) tokens are not counted. Each
+    response says which model wrote it (`LLMResponse.model`).
     """
 
     def __init__(self, fast: LLMClient, main: LLMClient) -> None:
         self.fast, self.main = fast, main
         self.model = main.model
 
-    async def complete(self, system, messages, tools) -> LLMResponse:
+    async def complete(self, system, messages, tools, on_text: TextSink | None = None):
+        kw: dict[str, Any] = {"on_text": on_text} if on_text else {}
         first_step = bool(messages) and messages[-1]["role"] == "user"
         first_step = first_step and isinstance(messages[-1]["content"], str)
         if first_step:
-            quick = await self.fast.complete(system, messages, tools)
+            quick = await self.fast.complete(system, messages, tools, **kw)
             if not quick.tool_uses:
                 return quick
-        return await self.main.complete(system, messages, tools)
+        return await self.main.complete(system, messages, tools, **kw)
 
 
 class FakeLLMClient:
@@ -93,7 +108,13 @@ class FakeLLMClient:
         self.calls: list[list[dict[str, Any]]] = []
         self.systems: list[str] = []
 
-    async def complete(self, system, messages, tools) -> LLMResponse:
+    async def complete(self, system, messages, tools, on_text: TextSink | None = None):
         self.calls.append(list(messages))
         self.systems.append(system)
-        return self._responses.pop(0)
+        resp = self._responses.pop(0)
+        if on_text is not None and resp.text:  # mimic streaming: a few words at a time
+            words = resp.text.split(" ")
+            for i in range(0, len(words), 3):
+                tail = " " if i + 3 < len(words) else ""
+                await on_text(" ".join(words[i : i + 3]) + tail)
+        return resp

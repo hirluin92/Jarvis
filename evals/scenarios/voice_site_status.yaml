@@ -1,0 +1,12 @@
+name: voice_site_status
+input: Controlla se i miei siti rispondono.
+expected_status: completed
+catalog: products.yaml
+extra_tools: []
+memories: []
+routed: true
+expected_tools:
+- site_status
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7
