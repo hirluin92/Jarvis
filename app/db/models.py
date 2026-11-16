@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -23,6 +23,7 @@ class Run(Base):
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     model: Mapped[str] = mapped_column(String(64), default="")
+    marked_bad: Mapped[bool] = mapped_column(Boolean, default=False)
     steps: Mapped[list["Step"]] = relationship(order_by="Step.idx", back_populates="run")
 
 

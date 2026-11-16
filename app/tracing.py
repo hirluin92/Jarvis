@@ -63,6 +63,15 @@ class Tracer:
             run.finished_at = datetime.now(UTC)
             await s.commit()
 
+    async def mark_bad(self, run_id: int) -> bool:
+        async with self._maker() as s:
+            run = await s.get(Run, run_id)
+            if run is None:
+                return False
+            run.marked_bad = True
+            await s.commit()
+            return True
+
     async def get_run(self, run_id: int) -> Run | None:
         async with self._maker() as s:
             q = select(Run).where(Run.id == run_id).options(selectinload(Run.steps))

@@ -21,6 +21,7 @@ from app.agent.loop import (
     run_agent,
 )
 from app.costs import estimate_cost, format_cost
+from app.feedback import mark_bad_and_draft
 from app.report import generate_report
 from app.tracing import Tracer
 
@@ -103,6 +104,19 @@ def build_handlers(state: BotState) -> list:
             f"Costo stimato: {cost}"
         )
 
+    async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        run_id = state.last_run.get(update.effective_chat.id)
+        path = await mark_bad_and_draft(state.tracer, run_id) if run_id else None
+        if path is None:
+            await update.effective_message.reply_text("Nessun run recente da segnalare.")
+            return
+        await update.effective_message.reply_text(
+            f"Run {run_id} segnalato come sbagliato. Bozza di scenario: evals/scenarios/drafts/"
+            f"{path.name}"
+        )
+
     async def report(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -153,6 +167,7 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("reset", reset),
         CommandHandler("last", last),
         CommandHandler("report", report),
+        CommandHandler("bad", bad),
         CallbackQueryHandler(on_button),
         MessageHandler(filters.TEXT & ~filters.COMMAND, on_text),
     ]
