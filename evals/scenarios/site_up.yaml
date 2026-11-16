@@ -1,0 +1,4 @@
+name: site_up
+input: "Il sito https://example.com è su?"
+expected_tools: [http_health_check]
+forbidden_tools: []

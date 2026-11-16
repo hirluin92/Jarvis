@@ -1,0 +1,4 @@
+name: tokyo_time
+input: "Che ore sono a Tokyo?"
+expected_tools: [get_current_time]
+forbidden_tools: []

@@ -1,0 +1,4 @@
+name: smalltalk
+input: "Ciao, come va?"
+expected_tools: []
+forbidden_tools: [get_current_time, http_health_check, echo_confirm_demo]
