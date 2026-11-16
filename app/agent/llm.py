@@ -197,6 +197,16 @@ class GeminiClient:
         return out
 
 
+def _wait(response: Any, attempt: int) -> float:
+    """Seconds to wait before retrying a busy/rate-limited call: what the server asks for."""
+    h = response.headers
+    try:
+        return min(float(h["retry-after"]), 30.0)
+    except (KeyError, ValueError):
+        pass
+    return float(2**attempt)
+
+
 class OpenAICompatClient:
     """Any server speaking the OpenAI chat-completions protocol (Groq, OpenRouter, Ollama...).
     Same contract as the other clients; history stays in Anthropic's block format."""
@@ -285,11 +295,11 @@ class OpenAICompatClient:
             out.input_tokens = u.get("prompt_tokens", out.input_tokens)
             out.output_tokens = u.get("completion_tokens", out.output_tokens)
 
-        for attempt in range(4):
+        for attempt in range(5):
             if on_text is None:
                 r = await self._http.post(self._url, json=body, headers=headers)
-                if r.status_code in (429, 503) and attempt < 3:
-                    await asyncio.sleep(2**attempt)
+                if r.status_code in (429, 503) and attempt < 4:
+                    await asyncio.sleep(_wait(r, attempt))
                     continue
                 r.raise_for_status()
                 data = r.json()
@@ -299,8 +309,9 @@ class OpenAICompatClient:
             async with self._http.stream(
                 "POST", self._url, json={**body, "stream": True}, headers=headers
             ) as r:
-                if r.status_code in (429, 503) and attempt < 3:
+                if r.status_code in (429, 503) and attempt < 4:
                     await r.aread()
+                    wait = _wait(r, attempt)
                 else:
                     if r.status_code >= 400:
                         await r.aread()
@@ -317,7 +328,7 @@ class OpenAICompatClient:
                                 await on_text(piece)
                     await on_text("\n")
                     break
-            await asyncio.sleep(2**attempt)
+            await asyncio.sleep(wait)
         for i in sorted(calls):
             c = calls[i]
             args = json.loads(c["args"]) if c["args"].strip() else {}

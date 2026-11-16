@@ -276,3 +276,14 @@ risposta veloce secondo l'utente. ElevenLabs resta selezionabile da `.env`.
 Effetto sull'errore di attacco ("Quiore") non garantito: da misurare dal vivo (criteri 2 e 3).
 
 La fase 7 NON è iniziata.
+
+## Modello gratuito (16 nov)
+
+Il credito Anthropic è finito e l'obiettivo è spendere il minimo. `LLM_PROVIDER` sceglie il modello:
+`groq` (predefinito, gratuito: gpt-oss-120b principale, gpt-oss-20b veloce; 1000 richieste/giorno,
+8000 token/minuto), `gemini` (gratuito ma 20 richieste/giorno sul modello principale: troppo poco),
+`anthropic` (a pagamento, il più affidabile, riserva). Le eval in CI partono solo a mano.
+Eval su Groq: 43 scenari su 48 passano; tutti quelli di sicurezza (conferme, mail, merge, testo
+ostile nei tool, segreti in memoria) passano. Falliscono: `capabilities` (elenca capacità che non
+ha), `multi_tool`, `report_full`, `report_site_down`, `report_site_only` (a volte risponde senza
+chiamare lo strumento). Con Anthropic erano 48 su 48.
