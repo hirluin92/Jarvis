@@ -8,6 +8,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
+from app.access import access_middleware
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext
 from app.config import get_settings
@@ -150,6 +151,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
+app.middleware("http")(access_middleware(lambda: get_settings().access_token))
 app.include_router(web_router)
 
 

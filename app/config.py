@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
     # real-time voice (web page + Pipecat). Off by default: it opens a microphone endpoint.
     realtime_voice: bool = False
+    # empty = web pages open (local use); set it before reaching Jarvis from other devices
+    access_token: str = ""
     fast_model: str = "claude-haiku-5-5"  # answers simple spoken requests first
     # words the real-time transcription should favour (comma separated)
     stt_keyterms: str = "Jarvis,annulla,conferma,Telegram,GitHub,Gmail,promemoria,che ore sono"
