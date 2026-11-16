@@ -113,10 +113,12 @@ class VoiceTurnHandler:
         get_ctx: Callable[[], Awaitable[AgentContext]],
         llm: LLMClient | None,
         notify_pending: Callable[[AgentResult], Awaitable[None]],
+        events: Any = None,
     ) -> None:
         self._get_ctx = get_ctx
         self._llm = llm
         self._notify_pending = notify_pending
+        self._events = events  # EventBus of the live screen, optional
         self._background: set[asyncio.Task] = set()
         self.last_run_id: int | None = None
         self.last_tracer: Any = None
@@ -129,10 +131,13 @@ class VoiceTurnHandler:
         ctx = await self._get_ctx()
         self.last_tracer = ctx.tracer
         interrupted = False
+        self._emit("heard", text=text)
+        self._emit("thinking")
 
         async def speak(sentence: str) -> None:
             if clock.first_text is None:
                 clock.first_text = time.monotonic()
+            self._emit("say", text=sentence)
             await say(sentence)
 
         sentencer = Sentencer(speak, lambda: interrupted)
@@ -145,18 +150,35 @@ class VoiceTurnHandler:
             result = await asyncio.shield(task)
         except asyncio.CancelledError:
             interrupted = True
+            self._emit("interrupted")
             self._background.add(task)
             task.add_done_callback(self._background.discard)
             raise
         clock.answered = time.monotonic()
         self.last_run_id = result.run_id
+        await self._emit_tools(ctx, result.run_id)
         if result.pending:
+            self._emit("pending", text=result.pending.label())
             await self._notify_pending(result)  # buttons on Telegram, never a spoken yes
             await speak(PENDING_SPEECH)
+            self._emit("done")
             return
         await sentencer.flush()
         if not sentencer.spoken and result.answer:  # a model that did not stream
             await speak(speakable(result.answer))
+        self._emit("done")
+
+    def _emit(self, kind: str, **data: Any) -> None:
+        if self._events is not None:
+            self._events.publish(kind, **data)
+
+    async def _emit_tools(self, ctx: AgentContext, run_id: int) -> None:
+        if self._events is None:
+            return
+        run = await ctx.tracer.get_run(run_id)
+        names = [s.tool_name for s in (run.steps if run else []) if s.type == "tool_call"]
+        if names:
+            self._emit("tools", names=names)
 
     async def record_latency(self, clock: TurnClock) -> None:
         """Write the latency breakdown of the turn on the run's trace."""
@@ -333,6 +355,10 @@ class RealtimeSessions:
     async def offer(self, request: Any, remote: bool = False) -> dict[str, str] | None:
         # a remote client (the phone, through Tailscale) hears itself: no voice interruption there
         mute = remote and not getattr(self._settings, "remote_barge_in", False)
+        if not getattr(request, "pc_id", None) and getattr(self._web, "_pcs_map", None):
+            # a brand new call while an old one is still being torn down (a dropped phone that
+            # reconnects): the new one wins, instead of being refused with a 400
+            await self._web.close()
 
         async def on_connection(connection: Any) -> None:
             task, runner = build_session(connection, self._settings, self._handler, mute)

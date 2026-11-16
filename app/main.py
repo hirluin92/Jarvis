@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 
 from app.access import access_middleware
@@ -15,12 +16,14 @@ from app.config import get_settings
 from app.conversations import ConversationStore
 from app.costs import estimate_cost
 from app.db import session as db
+from app.events import EventBus
 from app.interfaces.telegram import BotState, build_application, send_confirmation
 from app.memory import MemoryStore
 from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
+from app.ui import router as ui_router
 from app.voice.realtime import RealtimeSessions, VoiceTurnHandler
 from app.voice.routes import build_realtime_router
 from app.voice.service import VoiceService
@@ -64,6 +67,7 @@ def _run_dict(run, with_steps: bool = False) -> dict:
 async def lifespan(app: FastAPI):
     s = get_settings()  # fails fast with a clear pydantic error if a variable is missing
     db.init_db(s.database_url)
+    app.state.events = EventBus()
     tracer = Tracer(db.session_maker())
     llm, fast = build_llms(s)
     registry = default_registry()
@@ -117,7 +121,9 @@ async def lifespan(app: FastAPI):
             async def confirm_on_telegram(result) -> None:
                 await send_confirmation(bot.bot, bot_state, chat_id, result)
 
-            handler = VoiceTurnHandler(lambda: bot_state.ctx(chat_id), routed, confirm_on_telegram)
+            handler = VoiceTurnHandler(
+                lambda: bot_state.ctx(chat_id), routed, confirm_on_telegram, app.state.events
+            )
             realtime = RealtimeSessions(s, handler)
             app.state.realtime = realtime
             from pipecat_ai_prebuilt.frontend import PipecatPrebuiltUI
@@ -153,6 +159,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.middleware("http")(access_middleware(lambda: get_settings().access_token))
 app.include_router(web_router)
+app.include_router(ui_router)
+
+
+@app.get("/", include_in_schema=False)
+async def home() -> RedirectResponse:
+    return RedirectResponse("/jarvis")
 
 
 @app.get("/health")

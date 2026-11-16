@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04080d">
+<title>Jarvis</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%2300d9ff' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2300d9ff'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#04080d; --bg2:#08121c; --panel:rgba(8,22,34,.72); --line:rgba(0,217,255,.22);
+  --cyan:#00d9ff; --cyan-d:#0a8fa8; --amber:#ffb347; --red:#ff5d73; --green:#3df0a0;
+  --fg:#d9f6ff; --mut:#7fa3b3;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:radial-gradient(ellipse at 50% 38%,#0a1d2c 0%,var(--bg) 62%);
+  color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+  overflow:hidden;-webkit-tap-highlight-color:transparent;
+}
+body::before{ /* faint grid */
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;
+  background:linear-gradient(var(--line) 1px,transparent 1px) 0 0/48px 48px,
+             linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/48px 48px;
+  mask-image:radial-gradient(ellipse at center,#000 0%,transparent 70%);
+  -webkit-mask-image:radial-gradient(ellipse at center,#000 0%,transparent 70%);
+  opacity:.18;
+}
+.app{position:relative;display:grid;height:100%;grid-template-columns:1fr;grid-template-rows:auto 1fr auto;
+  padding:calc(12px + var(--safe-t)) 16px calc(12px + var(--safe-b))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-weight:700;letter-spacing:.42em;color:var(--cyan);text-shadow:0 0 14px rgba(0,217,255,.6)}
+.status{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mut);flex:none}
+.dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}
+.dot.bad{background:var(--red);box-shadow:0 0 10px var(--red)}
+.dot.warn{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.iconbtn{background:none;border:1px solid var(--line);color:var(--cyan);border-radius:10px;
+  padding:8px 12px;font:inherit;cursor:pointer}
+.iconbtn:hover,.iconbtn:focus-visible{background:rgba(0,217,255,.1);outline:none}
+main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
+.orbwrap{position:relative;width:min(78vw,52vh,520px);aspect-ratio:1}
+canvas{width:100%;height:100%;display:block}
+.state{font-size:13px;letter-spacing:.32em;text-transform:uppercase;color:var(--cyan);min-height:1.4em;text-align:center}
+.state.thinking{color:var(--amber)} .state.bad{color:var(--red)}
+.transcript{width:min(680px,100%);max-height:26vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+  padding:4px 2px;scrollbar-width:thin;scrollbar-color:var(--cyan-d) transparent}
+.msg{padding:9px 13px;border-radius:12px;max-width:92%;border:1px solid var(--line);background:var(--panel);
+  animation:in .25s ease-out both;word-wrap:break-word}
+.msg.you{align-self:flex-end;border-color:rgba(61,240,160,.3);color:#d6ffe9}
+.msg.jarvis{align-self:flex-start}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:11.5px;color:var(--amber);border:1px solid rgba(255,179,71,.4);border-radius:99px;padding:2px 9px}
+.msg.alert{border-color:var(--amber);color:var(--amber)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+footer{display:flex;flex-direction:column;align-items:center;gap:8px}
+.talk{width:76px;height:76px;border-radius:50%;border:2px solid var(--cyan);background:rgba(0,217,255,.08);
+  color:var(--cyan);cursor:pointer;display:grid;place-items:center;transition:.2s;
+  box-shadow:0 0 24px rgba(0,217,255,.35),inset 0 0 18px rgba(0,217,255,.15)}
+.talk:hover,.talk:focus-visible{background:rgba(0,217,255,.18);outline:none;transform:scale(1.04)}
+.talk.live{border-color:var(--red);color:var(--red);box-shadow:0 0 24px rgba(255,93,115,.35),inset 0 0 18px rgba(255,93,115,.15);background:rgba(255,93,115,.08)}
+.talk svg{width:30px;height:30px}
+.hint{color:var(--mut);font-size:12.5px;text-align:center;min-height:1.2em}
+
+/* side panels: a column on wide screens, a sheet on phones */
+aside{position:fixed;top:0;right:0;bottom:0;width:min(360px,92vw);background:rgba(4,12,20,.94);
+  border-left:1px solid var(--line);padding:calc(14px + var(--safe-t)) 16px calc(14px + var(--safe-b));
+  overflow-y:auto;transform:translateX(102%);transition:transform .28s ease;backdrop-filter:blur(8px);z-index:5}
+aside.open{transform:none}
+aside h2{font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--cyan);margin:18px 0 8px}
+aside h2:first-of-type{margin-top:6px}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:13.5px}
+.row{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:3px 0}
+.row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mut{color:var(--mut)} .small{font-size:12px}
+.report{white-space:pre-wrap}
+.close{display:block;margin:0 0 6px auto}
+@media(min-width:1000px){
+  .app{grid-template-columns:1fr 340px}
+  header,footer,main{grid-column:1}
+  aside{transform:none;width:340px;z-index:1;background:rgba(4,12,20,.55)}
+  .app>header .iconbtn#panels{display:none}
+  .close{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">JARVIS</div>
+    <div class="status"><span class="dot" id="dot"></span><span id="conn">offline</span>
+      <button class="iconbtn" id="panels" aria-label="Apri i pannelli">Pannelli</button></div>
+  </header>
+
+  <main>
+    <div class="orbwrap"><canvas id="orb" aria-hidden="true"></canvas></div>
+    <div class="state" id="state" role="status" aria-live="polite">Offline</div>
+    <div class="transcript" id="log" aria-live="polite" aria-label="Conversazione"></div>
+  </main>
+
+  <footer>
+    <button class="talk" id="talk" aria-label="Collegati e parla con Jarvis">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
+    <div class="hint" id="hint">Tocca il microfono per iniziare</div>
+  </footer>
+
+  <aside id="side" aria-label="Pannelli">
+    <button class="iconbtn close" id="close">Chiudi</button>
+    <h2>Siti</h2><div id="sites"><div class="card mut">Caricamento…</div></div>
+    <h2>In attesa di conferma</h2><div id="waiting"></div>
+    <h2>Report del mattino</h2><div id="report"></div>
+    <h2>Attività recente</h2><div id="recent"></div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const els = {orb:$("orb"), state:$("state"), log:$("log"), talk:$("talk"), hint:$("hint"),
+  dot:$("dot"), conn:$("conn"), side:$("side")};
+
+/* ---------- state ---------- */
+const LABELS = {offline:"Offline", connecting:"Mi collego…", listening:"In ascolto",
+  hearing:"Ti sento", thinking:"Ci penso", speaking:"Parlo", error:"Errore"};
+let mode = "offline", live = false, mutedHint = false;
+function setMode(m, detail) {
+  mode = m;
+  els.state.textContent = detail || LABELS[m] || m;
+  els.state.className = "state" + (m === "thinking" ? " thinking" : m === "error" ? " bad" : "");
+  els.dot.className = "dot" + (live ? (m === "error" ? " bad" : " on") : m === "connecting" ? " warn" : "");
+  els.conn.textContent = live ? "connesso" : m === "connecting" ? "collego" : "offline";
+}
+
+/* ---------- transcript ---------- */
+let current = null; // the Jarvis bubble being written
+function bubble(cls, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  const t = document.createElement("span");
+  t.textContent = text;
+  d.appendChild(t);
+  els.log.appendChild(d);
+  while (els.log.children.length > 24) els.log.removeChild(els.log.firstChild);
+  els.log.scrollTop = els.log.scrollHeight;
+  return d;
+}
+function addChips(node, names) {
+  const wrap = document.createElement("div");
+  wrap.className = "chips";
+  for (const n of [...new Set(names)]) {
+    const c = document.createElement("span");
+    c.className = "chip"; c.textContent = n;
+    wrap.appendChild(c);
+  }
+  node.appendChild(wrap);
+}
+
+/* ---------- server events (what Jarvis is doing) ---------- */
+let speakingUntil = 0;
+function startEvents() {
+  const es = new EventSource("/jarvis/events");
+  es.onmessage = (m) => {
+    let e; try { e = JSON.parse(m.data); } catch { return; }
+    if (e.type === "heard") { current = null; bubble("you", e.text); }
+    else if (e.type === "thinking") { if (live) setMode("thinking"); }
+    else if (e.type === "say") {
+      if (!current) current = bubble("jarvis", "");
+      const s = current.firstChild; s.textContent += (s.textContent ? " " : "") + e.text;
+      els.log.scrollTop = els.log.scrollHeight;
+      if (live) setMode("speaking");
+      speakingUntil = performance.now() + 1500;
+    }
+    else if (e.type === "tools") {
+      if (!current) current = bubble("jarvis", "…");
+      addChips(current, e.names);
+    }
+    else if (e.type === "pending") { bubble("alert", "Conferma richiesta su Telegram: " + e.text); loadData(); }
+    else if (e.type === "interrupted") { current = null; if (live) setMode("listening"); }
+    else if (e.type === "done") { current = null; loadData(); }
+  };
+}
+
+/* ---------- WebRTC ---------- */
+let pc = null, stream = null, audioCtx = null, micAn = null, outAn = null, wake = null;
+const player = new Audio(); player.autoplay = true; player.playsInline = true;
+
+function analyser(mediaStream) {
+  const src = audioCtx.createMediaStreamSource(mediaStream);
+  const an = audioCtx.createAnalyser();
+  an.fftSize = 256; an.smoothingTimeConstant = 0.75;
+  src.connect(an); // not connected to the speakers: playback goes through <audio>
+  return an;
+}
+async function waitIce(p) {
+  if (p.iceGatheringState === "complete") return;
+  await new Promise((ok) => {
+    const done = () => { if (p.iceGatheringState === "complete") { p.removeEventListener("icegatheringstatechange", done); ok(); } };
+    p.addEventListener("icegatheringstatechange", done);
+    setTimeout(ok, 3000);
+  });
+}
+async function connect() {
+  setMode("connecting"); els.hint.textContent = "Concedi l'accesso al microfono se richiesto";
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+    micAn = analyser(stream);
+    const start = await (await fetch("/start", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({enableDefaultIceServers:true})})).json();
+    pc = new RTCPeerConnection({iceServers: (start.iceConfig && start.iceConfig.iceServers) || []});
+    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    pc.ontrack = (ev) => {
+      player.srcObject = ev.streams[0];
+      player.play().catch(() => {});
+      outAn = analyser(ev.streams[0]);
+    };
+    pc.onconnectionstatechange = () => {
+      if (["failed", "disconnected", "closed"].includes(pc && pc.connectionState)) {
+        if (live) disconnect("Collegamento perso");
+      }
+    };
+    await pc.setLocalDescription(await pc.createOffer());
+    await waitIce(pc);
+    const res = await fetch(`/sessions/${start.sessionId}/api/offer`, {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({sdp: pc.localDescription.sdp, type: pc.localDescription.type})});
+    if (!res.ok) throw new Error("offerta rifiutata (" + res.status + ")");
+    const ans = await res.json();
+    await pc.setRemoteDescription({sdp: ans.sdp, type: ans.type});
+    live = true; els.talk.classList.add("live");
+    els.talk.setAttribute("aria-label", "Scollegati");
+    els.hint.textContent = "Parla pure. Tocca di nuovo per chiudere";
+    setMode("listening");
+    try { wake = await navigator.wakeLock.request("screen"); } catch {}
+  } catch (err) {
+    disconnect(null);
+    setMode("error", "Errore");
+    els.hint.textContent = (err && err.name === "NotAllowedError")
+      ? "Microfono negato: abilitalo nelle impostazioni del browser"
+      : "Non riesco a collegarmi: " + (err && err.message || err);
+  }
+}
+function disconnect(msg) {
+  live = false;
+  try { pc && pc.close(); } catch {}
+  stream && stream.getTracks().forEach((t) => t.stop());
+  player.srcObject = null; pc = stream = micAn = outAn = null;
+  try { wake && wake.release(); } catch {}
+  els.talk.classList.remove("live");
+  els.talk.setAttribute("aria-label", "Collegati e parla con Jarvis");
+  setMode("offline");
+  els.hint.textContent = msg || "Tocca il microfono per iniziare";
+}
+els.talk.addEventListener("click", () => (live || mode === "connecting") ? disconnect() : connect());
+
+/* ---------- orb ---------- */
+const ctx = els.orb.getContext("2d");
+let W = 0, H = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const r = els.orb.getBoundingClientRect();
+  W = els.orb.width = Math.round(r.width * dpr); H = els.orb.height = Math.round(r.height * dpr);
+}
+new ResizeObserver(resize).observe(els.orb); resize();
+function level(an) {
+  if (!an) return 0;
+  const buf = new Uint8Array(an.frequencyBinCount);
+  an.getByteFrequencyData(buf);
+  let s = 0; for (let i = 2; i < 40; i++) s += buf[i];
+  return Math.min(1, s / (38 * 150));
+}
+const spectrum = new Float32Array(96);
+let lvlIn = 0, lvlOut = 0, t0 = performance.now();
+const COLORS = {offline:[60,110,125], connecting:[255,179,71], listening:[0,217,255], hearing:[61,240,160],
+  thinking:[255,179,71], speaking:[120,240,255], error:[255,93,115]};
+function frame(now) {
+  const t = (now - t0) / 1000;
+  lvlIn += (level(micAn) - lvlIn) * 0.3;
+  lvlOut += (level(outAn) - lvlOut) * 0.3;
+  // derive "hearing"/"speaking" from the audio itself when the server says nothing
+  if (live && mode === "listening" && lvlIn > 0.18) setMode("hearing");
+  else if (live && mode === "hearing" && lvlIn < 0.1) setMode("listening");
+  if (live && mode === "listening" && lvlOut > 0.12) setMode("speaking");
+  else if (live && mode === "speaking" && lvlOut < 0.04 && now > speakingUntil) setMode("listening");
+
+  const c = COLORS[mode] || COLORS.offline, col = (a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const energy = mode === "speaking" ? lvlOut : mode === "hearing" ? lvlIn : mode === "thinking" ? 0.35 + 0.15 * Math.sin(t * 6) : 0.06 + 0.03 * Math.sin(t * 1.6);
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.27;
+  ctx.clearRect(0, 0, W, H);
+
+  // glow
+  const g = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, Math.min(W, H) / 2);
+  g.addColorStop(0, col(0.30 + energy * 0.4)); g.addColorStop(0.55, col(0.07)); g.addColorStop(1, col(0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  // static + rotating rings
+  ctx.lineWidth = 1.5 * dpr;
+  const spin = mode === "thinking" ? 2.4 : 0.35;
+  for (let i = 0; i < 3; i++) {
+    const rr = R * (1.35 + i * 0.22), a0 = t * spin * (i % 2 ? -1 : 1) + i;
+    ctx.strokeStyle = col(0.45 - i * 0.1); ctx.setLineDash([R * (0.35 - i * 0.07), R * (0.18 + i * 0.1)]);
+    ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a0 + Math.PI * 2); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // reactive spectrum ring
+  const src = mode === "speaking" ? outAn : micAn;
+  const N = spectrum.length, buf = src ? new Uint8Array(src.frequencyBinCount) : null;
+  if (src) src.getByteFrequencyData(buf);
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const k = i % N, v = buf ? buf[2 + (k % 48)] / 255 : 0;
+    spectrum[k] += (v - spectrum[k]) * 0.35;
+    const a = (k / N) * Math.PI * 2 - Math.PI / 2;
+    const amp = R * (1 + 0.10 * Math.sin(t * 2 + k * 0.4) * (0.4 + energy) + spectrum[k] * 0.55 * (mode === "offline" ? 0.2 : 1));
+    const x = cx + Math.cos(a) * amp, y = cy + Math.sin(a) * amp;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = col(0.95); ctx.lineWidth = 2.5 * dpr; ctx.shadowColor = col(1); ctx.shadowBlur = 18 * dpr; ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // core
+  const cr = R * (0.38 + energy * 0.22);
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+  core.addColorStop(0, "rgba(255,255,255,.95)"); core.addColorStop(0.35, col(0.9)); core.addColorStop(1, col(0));
+  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- panels ---------- */
+const STATUS = {completed:"fatto", awaiting_confirmation:"in attesa di conferma", failed:"errore", error:"errore", max_iterations:"interrotto"};
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function hhmm(iso) { return new Date(iso).toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"}); }
+async function loadData() {
+  let d; try { const r = await fetch("/jarvis/data"); if (!r.ok) return; d = await r.json(); } catch { return; }
+  const sites = $("sites"); sites.replaceChildren();
+  if (!d.sites.length) sites.append(el("div", "card mut", "Nessun sito configurato"));
+  for (const s of d.sites) {
+    const row = el("div", "card row");
+    const left = el("div", "name"); left.append(el("span", "dot " + (s.ok ? "on" : "bad")), " ", s.product);
+    const right = el("div", "mut small", s.ok ? (s.ms != null ? s.ms + " ms" : "ok") : "non risponde");
+    if (s.cert_days != null && s.cert_days < 21) right.textContent += " · cert " + s.cert_days + " g";
+    row.append(left, right); sites.append(row);
+  }
+  const w = $("waiting"); w.replaceChildren();
+  if (!d.waiting.length) w.append(el("div", "card mut", "Niente in attesa"));
+  for (const r of d.waiting) w.append(el("div", "card", r.message + " — conferma su Telegram"));
+  const rp = $("report"); rp.replaceChildren();
+  rp.append(d.report ? (() => { const c = el("div", "card"); c.append(el("div", "mut small", hhmm(d.report.at)), el("div", "report", d.report.answer)); return c; })()
+    : el("div", "card mut", "Ancora nessun report"));
+  const rc = $("recent"); rc.replaceChildren();
+  for (const r of d.recent) { const c = el("div", "card"); c.append(el("div", "mut small", hhmm(r.at) + " · " + (STATUS[r.status] || r.status)), el("div", "", r.message)); rc.append(c); }
+  if (!d.realtime && !live) els.hint.textContent = "Voce in tempo reale non attiva (REALTIME_VOICE)";
+}
+$("panels").addEventListener("click", () => els.side.classList.add("open"));
+$("close").addEventListener("click", () => els.side.classList.remove("open"));
+setInterval(loadData, 30000);
+
+startEvents(); loadData(); setMode("offline");
+</script>
+</body>
+</html>

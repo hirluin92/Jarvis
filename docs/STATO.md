@@ -287,3 +287,14 @@ Eval su Groq: 43 scenari su 48 passano; tutti quelli di sicurezza (conferme, mai
 ostile nei tool, segreti in memoria) passano. Falliscono: `capabilities` (elenca capacità che non
 ha), `multi_tool`, `report_full`, `report_site_down`, `report_site_only` (a volte risponde senza
 chiamare lo strumento). Con Anthropic erano 48 su 48.
+
+## Fase 8 — schermata "effetto Jarvis" (17 nov)
+
+`/jarvis`: pagina unica (HTML/JS senza dipendenze, servita da Jarvis) con orb animato su canvas,
+stato in tempo reale (eventi SSE da `app/events.py`), trascrizione con gli strumenti usati e
+pannelli (siti, conferme in attesa, report, attività). Collegamento WebRTC diretto agli stessi
+endpoint della voce. Provata in Chrome con microfono finto (connessione, nessun errore di pagina,
+riconnessione immediata) e in versione telefono (screenshot); il comportamento con la tua voce
+reale va guardato dal vivo. Le chiamate nuove sostituiscono una sessione vecchia ancora aperta
+(prima davano 400 dopo una caduta di rete). Limiti: nessun pulsante di conferma sulla pagina
+(solo Telegram); ancora nessuna installazione come app (PWA).

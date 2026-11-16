@@ -58,3 +58,12 @@ e programma sul PC una chiamata ogni 5 minuti a quell'URL **solo se** `/health` 
 - Il report delle 7:30 arriva solo con il PC acceso a quell'ora.
 - Il criterio "dopo un riavvio torna su da solo" è predisposto (restart + avvio di Docker Desktop)
   ma va verificato riavviando davvero il PC.
+
+## Schermata "effetto Jarvis" (fase 8)
+
+Indirizzo: `/jarvis` (la home `/` porta lì). Si apre da PC (`http://localhost:8000/jarvis`) e dal
+telefono (`https://<nome>.ts.net/jarvis?token=...`). Un orb animato reagisce al microfono e alla
+voce di Jarvis; sotto, lo stato (in ascolto / ti sento / ci penso / parlo), la trascrizione con
+gli strumenti usati, e i pannelli (siti, conferme in attesa, report del mattino, attività recente).
+Le conferme si danno **solo su Telegram**: la schermata le mostra, non le approva.
+Il collegamento vocale è lo stesso della fase 6 (`REALTIME_VOICE=1`).
