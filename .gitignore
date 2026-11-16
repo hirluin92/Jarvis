@@ -6,3 +6,5 @@ __pycache__/
 .ruff_cache/
 
 evals/results/
+evals/voice/audio/
+evals/voice/results/

@@ -168,4 +168,21 @@ Limiti noti:
 
 Eval: 41 scenari, tutti PASS, 166 s, circa $0.55 per esecuzione (il prompt è cresciuto con i tool).
 
-Le fasi 6-7 NON sono iniziate.
+## Fase 6 — Voce: IN CORSO, solo il benchmark (2026-11-16)
+
+Fatto: benchmark in italiano (`uv run python -m evals.voice.bench`, rapporto in
+`docs/voce-benchmark.md`). Fornitori provati: trascrizione con Deepgram Nova-3, ElevenLabs Scribe
+e Cartesia Ink-Whisper; voce con ElevenLabs (multilingual v2 e flash v2.5) e Cartesia Sonic 3.6
+(voci Elena e Lorenzo). Soniox lasciato fuori (nessun credito gratuito sulle API). Chiavi in
+`.env`: `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`.
+
+Risultato provvisorio, su audio sintetico (venti frasi): Scribe 0-0,4% di errori, Deepgram 1,2-8%,
+Cartesia Ink 5-6%; il primo audio della sintesi arriva in 86-330 ms su tutte le voci. Tutti i
+servizi sbagliano "No, annulla" (sentito come "a nulla"). I fornitori NON sono ancora fissati:
+manca la prova con le registrazioni vere dell'utente e l'ascolto delle voci.
+
+Da fare: registrazioni vere (5-8 frasi) e ascolto delle voci per scegliere; poi il passo 1
+(messaggi vocali su Telegram) e il passo 2 (tempo reale con Pipecat). I fornitori vanno
+configurabili da `.env` (criterio 5).
+
+Le fasi 7 NON è iniziata.

@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     tool_timeout_seconds: float = 30
     github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
     github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
+    deepgram_api_key: str = ""
+    elevenlabs_api_key: str = ""
+    cartesia_api_key: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
     google_refresh_token: str = ""

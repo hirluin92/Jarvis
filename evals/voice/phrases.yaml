@@ -1,0 +1,23 @@
+# 20 Italian phrases for the voice benchmark: short commands, names, numbers, long sentences,
+# hard sounds. Digits are written as words so every service sees the same reference.
+phrases:
+  - Che ore sono a Tokyo?
+  - Accendi la luce del salotto e abbassa il riscaldamento.
+  - Ricordami di chiamare il dottor Bianchi domani alle nove.
+  - Prenota un tavolo per quattro persone venerdì sera alle venti.
+  - Quanto costa la spedizione di un pacco da tre chili a Palermo?
+  - Il sito di Jarvis risponde?
+  - Controlla se ci sono pull request aperte sul repository.
+  - Scrivi una mail ad Anna per confermare l'appuntamento di lunedì prossimo.
+  - Aggiungi alla lista della spesa latte, uova, pane e due chili di mele.
+  - Dimentica che il mio dentista è il dottor Bianchi.
+  - Sì, conferma.
+  - No, annulla.
+  - Mi sono trasferito a Torino lo scorso settembre e abito vicino al Valentino.
+  - Il fatturato del terzo trimestre è cresciuto del dodici per cento rispetto all'anno scorso.
+  - Imposta il promemoria per il ventitré dicembre.
+  - Ho bisogno di un riassunto della riunione di ieri con le decisioni principali.
+  - Gli gnocchi alla sorrentina sono il mio piatto preferito, ma non li faccio mai bene.
+  - Vorrei sapere se piove domani a Bologna e se serve l'ombrello.
+  - Ripeti l'ultima risposta più lentamente, per favore.
+  - Quanti euro ho speso questo mese in abbonamenti e servizi online?
