@@ -9,8 +9,11 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    llm_provider: str = "gemini"  # gemini (free tier) | anthropic
+    llm_provider: str = "gemini"  # gemini | groq | anthropic
     anthropic_api_key: str = ""
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_fast_model: str = "llama-3.1-8b-instant"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"
     gemini_fast_model: str = "gemini-3.5-flash-lite"

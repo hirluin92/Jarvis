@@ -197,11 +197,145 @@ class GeminiClient:
         return out
 
 
+class OpenAICompatClient:
+    """Any server speaking the OpenAI chat-completions protocol (Groq, OpenRouter, Ollama...).
+    Same contract as the other clients; history stays in Anthropic's block format."""
+
+    def __init__(self, base_url: str, api_key: str, model: str, client: Any = None) -> None:
+        import httpx
+
+        self._url = base_url.rstrip("/") + "/chat/completions"
+        self._key = api_key
+        self.model = model
+        self._http = client or httpx.AsyncClient(timeout=60)
+
+    @staticmethod
+    def _messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        import json
+
+        out: list[dict[str, Any]] = [{"role": "system", "content": system}]
+        for m in messages:
+            if isinstance(m["content"], str):
+                out.append({"role": m["role"], "content": m["content"]})
+                continue
+            text = "".join(b["text"] for b in m["content"] if b["type"] == "text")
+            calls = [
+                {
+                    "id": b["id"],
+                    "type": "function",
+                    "function": {"name": b["name"], "arguments": json.dumps(b["input"])},
+                }
+                for b in m["content"]
+                if b["type"] == "tool_use"
+            ]
+            if calls:
+                out.append({"role": "assistant", "content": text or None, "tool_calls": calls})
+            elif text:
+                out.append({"role": m["role"], "content": text})
+            for b in m["content"]:
+                if b["type"] == "tool_result":
+                    content = b["content"]
+                    if not isinstance(content, str):
+                        content = "".join(c.get("text", "") for c in content)
+                    tool_msg = {
+                        "role": "tool",
+                        "tool_call_id": b["tool_use_id"],
+                        "content": content,
+                    }
+                    out.append(tool_msg)
+        return out
+
+    async def complete(self, system, messages, tools, on_text: TextSink | None = None):
+        import json
+
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": self._messages(system, messages),
+            "max_tokens": 2048,
+        }
+        if tools:
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t["description"],
+                        "parameters": t["input_schema"],
+                    },
+                }
+                for t in tools
+            ]
+        headers = {"Authorization": f"Bearer {self._key}"}
+        out = LLMResponse(model=self.model)
+        calls: dict[int, dict[str, str]] = {}
+
+        def take(choice: dict[str, Any]) -> str:
+            part = choice.get("delta") or choice.get("message") or {}
+            for tc in part.get("tool_calls") or []:
+                blank = {"id": "", "name": "", "args": ""}
+                slot = calls.setdefault(tc.get("index", len(calls)), blank)
+                slot["id"] = tc.get("id") or slot["id"]
+                fn = tc.get("function") or {}
+                slot["name"] += fn.get("name") or ""
+                slot["args"] += fn.get("arguments") or ""
+            return part.get("content") or ""
+
+        def usage_of(chunk: dict[str, Any]) -> None:
+            u = chunk.get("usage") or (chunk.get("x_groq") or {}).get("usage") or {}
+            out.input_tokens = u.get("prompt_tokens", out.input_tokens)
+            out.output_tokens = u.get("completion_tokens", out.output_tokens)
+
+        for attempt in range(4):
+            if on_text is None:
+                r = await self._http.post(self._url, json=body, headers=headers)
+                if r.status_code in (429, 503) and attempt < 3:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                r.raise_for_status()
+                data = r.json()
+                out.text = take(data["choices"][0])
+                usage_of(data)
+                break
+            async with self._http.stream(
+                "POST", self._url, json={**body, "stream": True}, headers=headers
+            ) as r:
+                if r.status_code in (429, 503) and attempt < 3:
+                    await r.aread()
+                else:
+                    if r.status_code >= 400:
+                        await r.aread()
+                        r.raise_for_status()
+                    async for line in r.aiter_lines():
+                        if not line.startswith("data:") or line.strip() == "data: [DONE]":
+                            continue
+                        chunk = json.loads(line[5:])
+                        usage_of(chunk)
+                        for choice in chunk.get("choices") or []:
+                            piece = take(choice)
+                            if piece:
+                                out.text += piece
+                                await on_text(piece)
+                    await on_text("\n")
+                    break
+            await asyncio.sleep(2**attempt)
+        for i in sorted(calls):
+            c = calls[i]
+            args = json.loads(c["args"]) if c["args"].strip() else {}
+            out.tool_uses.append(ToolUse(c["id"] or f"call_{i}", c["name"], args))
+        return out
+
+
 def build_llms(s: Any) -> tuple[LLMClient, LLMClient]:
     """(main, fast) models for the provider chosen in LLM_PROVIDER."""
     if s.llm_provider == "gemini":
         return GeminiClient(s.gemini_api_key, s.gemini_model), GeminiClient(
             s.gemini_api_key, s.gemini_fast_model
+        )
+    if s.llm_provider == "groq":
+        base = "https://api.groq.com/openai/v1"
+        return (
+            OpenAICompatClient(base, s.groq_api_key, s.groq_model),
+            OpenAICompatClient(base, s.groq_api_key, s.groq_fast_model),
         )
     if s.llm_provider == "anthropic":
         return (

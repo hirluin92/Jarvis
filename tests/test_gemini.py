@@ -67,3 +67,68 @@ async def test_busy_model_is_retried(monkeypatch):
 
 async def _noop():
     return None
+
+
+def compat(handler):
+    from app.agent.llm import OpenAICompatClient
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return OpenAICompatClient("https://x/v1", "key", "m", http)
+
+
+async def test_openai_compat_tool_call_and_history():
+    seen: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        assert request.headers["authorization"] == "Bearer key"
+        if len(seen) == 1:
+            call = {"id": "c1", "function": {"name": "t", "arguments": '{"a": 1}'}}
+            msg = {"content": None, "tool_calls": call and [call]}
+        else:
+            msg = {"content": "fatto"}
+        usage = {"prompt_tokens": 4, "completion_tokens": 1}
+        return httpx.Response(200, json={"choices": [{"message": msg}], "usage": usage})
+
+    llm = compat(handler)
+    first = await llm.complete("sys", [{"role": "user", "content": "ciao"}], TOOLS)
+    assert first.tool_uses[0].id == "c1" and first.tool_uses[0].input == {"a": 1}
+    history = [
+        {"role": "user", "content": "ciao"},
+        {"role": "assistant", "content": first.to_assistant_content()},
+        {
+            "role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": "c1", "content": "ok"}],
+        },
+    ]
+    second = await llm.complete("sys", history, TOOLS)
+    assert second.text == "fatto" and second.input_tokens == 4
+    roles = [m["role"] for m in seen[1]["messages"]]
+    assert roles == ["system", "user", "assistant", "tool"]
+    assert seen[1]["messages"][2]["tool_calls"][0]["function"]["arguments"] == '{"a": 1}'
+
+
+async def test_openai_compat_streams_text_and_tool_fragments():
+    def sse(*chunks):
+        lines = "".join(f"data: {json.dumps(c)}\n\n" for c in chunks) + "data: [DONE]\n\n"
+        return httpx.Response(200, content=lines.encode())
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["stream"] is True
+        t1 = {"index": 0, "id": "c1", "function": {"name": "t", "arguments": '{"a"'}}
+        t2 = {"index": 0, "function": {"arguments": ": 2}"}}
+        return sse(
+            {"choices": [{"delta": {"content": "Ciao "}}]},
+            {"choices": [{"delta": {"content": "mondo."}}]},
+            {"choices": [{"delta": {"tool_calls": [t1]}}]},
+            {"choices": [{"delta": {"tool_calls": [t2]}}]},
+        )
+
+    got: list[str] = []
+
+    async def sink(piece: str) -> None:
+        got.append(piece)
+
+    out = await compat(handler).complete("s", [{"role": "user", "content": "x"}], TOOLS, sink)
+    assert out.text == "Ciao mondo." and got[-1] == "\n"
+    assert out.tool_uses[0].input == {"a": 2}
