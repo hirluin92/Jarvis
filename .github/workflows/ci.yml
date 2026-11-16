@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:  # evals cost real money: run them by hand from the Actions tab
   push:
     branches: [main]
 
@@ -20,9 +21,10 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
-      - name: Evals (real model, capped spend)
+      - name: Evals (real model, capped spend; manual runs only)
+        if: github.event_name == 'workflow_dispatch'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # GitHub forbids secret names starting with GITHUB_, hence the GH_ prefix everywhere
           GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
-        run: uv run python -m evals.run --max-cost 1.00
+        run: uv run python -m evals.run --max-cost 0.50
