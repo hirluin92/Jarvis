@@ -79,3 +79,19 @@ async def test_slow_listener_loses_old_events_instead_of_blocking():
     assert q.qsize() == 100
     first = await asyncio.wait_for(q.get(), 1)
     assert first["text"] == "50"
+
+
+def test_3d_orb_files_are_vendored_and_wired_into_the_page():
+    from pathlib import Path
+
+    ui_dir = Path(ui.__file__).parent / "ui"
+    page = (ui_dir / "jarvis.html").read_text(encoding="utf-8")
+    assert '"three":"/jarvis/ui/vendor/three.module.js"' in page
+    assert "/jarvis/ui/orb3d.js" in page and 'id="gl"' in page
+    orb = (ui_dir / "orb3d.js").read_text(encoding="utf-8")
+    for line in orb.splitlines():
+        if line.startswith("import ") and "./vendor/" in line:
+            rel = line.split('"')[1]
+            assert (ui_dir / rel).is_file(), rel  # no CDN: everything is served by Jarvis
+    assert (ui_dir / "vendor" / "three.module.js").is_file()
+    assert (ui_dir / "vendor" / "LICENSE-three.txt").is_file()

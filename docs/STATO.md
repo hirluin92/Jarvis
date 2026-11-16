@@ -302,3 +302,10 @@ anelli HUD con tacche e radar, barre dello spettro, polvere luminosa sullo sfond
 ghiaccio; scelta ricordata), orologio, trascrizione a vetro con strumenti usati. `?demo=1` mostra
 tutti gli stati senza parlare. Limiti: nessun pulsante di conferma sulla pagina
 (solo Telegram); ancora nessuna installazione come app (PWA).
+
+Terza versione grafica (17 nov): orb 3D su GPU (three.js 0.160 incluso in `app/ui/vendor`, licenza MIT,
+nessuna CDN) con 16.000 particelle (7.000 su telefono), shader con rumore e spettro della voce, due
+anelli orbitanti, nucleo luminoso, bloom, onda d'urto a ogni frase, vortice a spirale mentre elabora,
+trascinamento col dito/mouse per ruotarlo; effetto "glitch" sul cambio di stato. Se il browser non
+supporta WebGL resta l'orb 2D (anche `?lite` per forzarlo). Provato in Chrome con rendering software;
+le prestazioni su telefono vere vanno viste dal vivo.

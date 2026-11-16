@@ -1,12 +1,15 @@
 import asyncio
 import logging
+import mimetypes
 import secrets
 from contextlib import asynccontextmanager
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.access import access_middleware
@@ -29,6 +32,7 @@ from app.voice.routes import build_realtime_router
 from app.voice.service import VoiceService
 from app.web import router as web_router
 
+mimetypes.add_type("text/javascript", ".js")  # Windows may map .js to text/plain: modules need JS
 log = logging.getLogger("jarvis.main")
 
 
@@ -160,6 +164,7 @@ app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.middleware("http")(access_middleware(lambda: get_settings().access_token))
 app.include_router(web_router)
 app.include_router(ui_router)
+app.mount("/jarvis/ui", StaticFiles(directory=Path(__file__).parent / "ui"), name="jarvis-ui")
 
 
 @app.get("/", include_in_schema=False)
