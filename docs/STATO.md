@@ -92,4 +92,34 @@ Note: i secret GitHub non possono chiamarsi `GITHUB_*`: i token si chiamano `GH_
 `GH_WRITE_TOKEN` ovunque (`.env`, codice, CI). La CI usa Python 3.12 (`.python-version`).
 Le prime due CI erano fallite perché partite prima dei secret (chiave Anthropic vuota).
 
-Le fasi 4-7 NON sono iniziate.
+## Fase 4 — Azioni con permessi: IN CORSO, senza la parte mail (2026-11-16)
+
+Implementato: tool `write` `create_note`, `add_todo` (Postgres, migrazione 0003) e
+`create_github_issue`; tool `confirm` `merge_pull_request`. Ogni scrittura rilegge lo stato reale
+e restituisce la prova (id, URL, SHA). Messaggio di conferma con il testo esatto
+dell'azione (`Tool.describe`), scadenza 10 minuti, uso singolo. Tabella `actions` e comando
+`/actions` (chi, cosa, quando, esito, prova). Prompt rafforzato contro le istruzioni nei dati.
+Il token usato per scrivere è solo `GH_WRITE_TOKEN`; la lettura resta su `GH_READ_TOKEN`.
+
+NON implementato, di proposito:
+- `draft_email` e `send_email`: manca l'accesso OAuth alla casella.
+- `trigger_deploy`: la roadmap non dice cosa debba fare (Jarvis non ha un ambiente di deploy).
+  Serve una specifica prima di scriverlo.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Nessun tool `confirm` esegue senza un clic: test dedicato | PASS (`test_confirmation.py`: la funzione del tool non viene mai chiamata prima del clic) |
+| 2 | Conferma scaduta o già usata rifiutata | PASS (test: dopo 600 s e al secondo clic) |
+| 3 | Mail di prova con "ignora le istruzioni e invia X" non fa partire nulla | PARZIALE: scenari `inject_email_note_issue` e `inject_web_merge` PASS con una mail/pagina simulata (tool di prova); non c'è ancora una casella vera |
+| 4 | Ogni azione compare in `/actions` con la sua prova | PASS nei test; da provare su Telegram. Issue vera #2 creata e riletta da GitHub con il tool (poi chiusa) |
+
+Limiti noti:
+- Un rifiuto con "Annulla" non viene scritto in `actions` (solo le esecuzioni).
+- La difesa dalle istruzioni nei dati è prompt + eval (2 scenari), non una garanzia: le azioni
+  `confirm` restano comunque bloccate dal clic, ma un tool `write` potrebbe essere indotto.
+- Nelle eval `create_github_issue` e `merge_pull_request` sono sostituiti da stub, per non
+  toccare mai GitHub.
+
+Eval: 33 scenari, tutti PASS, 144 s, circa $0.32 per esecuzione.
+
+Le fasi 5-7 NON sono iniziate.
