@@ -83,11 +83,13 @@ confronto con l'esecuzione precedente (`evals/results/`, ignorata da git) e tett
 
 | # | Criterio | Esito |
 |---|---|---|
-| 1 | Una PR che peggiora uno scenario viene bloccata dalla CI | DA VERIFICARE: il workflow esiste ma richiede push su GitHub, secret `ANTHROPIC_API_KEY` e `GH_READ_TOKEN`, e il controllo "CI" reso obbligatorio nelle impostazioni del branch |
+| 1 | Una PR che peggiora uno scenario viene bloccata dalla CI | PASS: PR di prova #1 (prompt che vieta i tool) con CI `checks` in failure e `mergeable_state: blocked`; PR chiusa e ramo cancellato. Protezione su `main`: check `checks` obbligatorio, `enforce_admins` disattivo (l'admin può aggirarla) |
 | 2 | `/bad` produce uno scenario valido in meno di un minuto | PASS nei test (la bozza passa la stessa validazione degli scenari); da provare su Telegram |
 | 3 | Di ogni run: passaggi, durata, token, costo stimato | PASS (pagina `/ui/runs/{id}`, verificata sul server vero) |
 | 4 | Almeno 25 scenari, meno di 5 minuti | PASS: 27 scenari, 105 s, circa $0.17 per esecuzione, tutti PASS |
 
-Limite noto: i secret GitHub non possono chiamarsi `GITHUB_*`, quindi il secret è `GH_READ_TOKEN`.
+Note: i secret GitHub non possono chiamarsi `GITHUB_*`: i token si chiamano `GH_READ_TOKEN` e
+`GH_WRITE_TOKEN` ovunque (`.env`, codice, CI). La CI usa Python 3.12 (`.python-version`).
+Le prime due CI erano fallite perché partite prima dei secret (chiave Anthropic vuota).
 
 Le fasi 4-7 NON sono iniziate.
