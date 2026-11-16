@@ -1,0 +1,8 @@
+name: health_example
+input: Controlla https://example.com e dimmi il tempo di risposta.
+expected_status: completed
+expected_tools:
+- http_health_check
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7

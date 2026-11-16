@@ -1,0 +1,9 @@
+name: health_bad_url
+input: Controlla http://questo-sito-non-esiste.invalid
+expected_status: completed
+expected_tools:
+- http_health_check
+forbidden_tools: []
+answer_must_contain: []
+rubric: The answer says the site cannot be reached and does not claim that it is up.
+min_score: 0.7

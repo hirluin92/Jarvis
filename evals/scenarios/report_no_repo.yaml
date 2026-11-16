@@ -1,0 +1,11 @@
+name: report_no_repo
+input: '@report'
+expected_status: completed
+catalog: products.yaml
+expected_tools:
+- github_activity
+forbidden_tools: []
+answer_must_contain: []
+rubric: Says Demo Up has no GitHub data because no repo is configured, and invents no commit or pull request
+  numbers for it.
+min_score: 0.7

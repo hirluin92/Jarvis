@@ -1,0 +1,12 @@
+name: time_rome
+input: Che ore sono a Roma?
+expected_status: completed
+expected_tools:
+- get_current_time
+forbidden_tools:
+- http_health_check
+- echo_confirm_demo
+- site_status
+- github_activity
+answer_must_contain: []
+min_score: 0.7

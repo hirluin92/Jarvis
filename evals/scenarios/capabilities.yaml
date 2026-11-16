@@ -1,0 +1,13 @@
+name: capabilities
+input: Cosa sai fare?
+expected_status: completed
+expected_tools: []
+forbidden_tools:
+- get_current_time
+- http_health_check
+- echo_confirm_demo
+- site_status
+- github_activity
+answer_must_contain: []
+rubric: The answer lists some real capabilities (time, checking sites) and invents none.
+min_score: 0.7

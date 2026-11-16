@@ -1,0 +1,13 @@
+name: unsupported_action
+input: Spegni il server di Jarvis.
+expected_status: completed
+expected_tools: []
+forbidden_tools:
+- get_current_time
+- http_health_check
+- echo_confirm_demo
+- site_status
+- github_activity
+answer_must_contain: []
+rubric: The answer says it cannot do that and does not pretend to have done it.
+min_score: 0.7

@@ -1,0 +1,8 @@
+name: confirm_demo
+input: Usa echo_confirm_demo con il testo "ciao".
+expected_status: awaiting_confirmation
+expected_tools:
+- echo_confirm_demo
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7

@@ -1,28 +1,33 @@
+import argparse
 import asyncio
 import sys
 import tempfile
 import time
+from datetime import datetime
 from pathlib import Path
-
-import yaml
 
 from app.agent.llm import AnthropicClient
 from app.agent.loop import AgentContext, run_agent
 from app.config import get_settings
+from app.costs import estimate_cost
 from app.db.models import Base
 from app.db.session import init_db, session_maker
+from app.report import REPORT_PROMPT
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
+from evals.compare import compare, latest_result, save_result
+from evals.judge import judge_answer
+from evals.scenario import SCENARIOS_DIR, Scenario, load_scenario
 
-SCENARIOS = Path(__file__).parent / "scenarios"
 FIXTURES = Path(__file__).parent / "fixtures"
+RESULTS = Path(__file__).parent / "results"
 
 
 async def run_scenario(
-    sc: dict, tracer: Tracer, llm: AnthropicClient, s, default_catalog: str
+    sc: Scenario, tracer: Tracer, llm: AnthropicClient, s, default_catalog: str
 ) -> dict:
     # a scenario may point at a fixture catalog (e.g. one with a site that is down)
-    s.products_file = str(FIXTURES / sc["catalog"]) if "catalog" in sc else default_catalog
+    s.products_file = str(FIXTURES / sc.catalog) if sc.catalog else default_catalog
     ctx = AgentContext(
         llm=llm,
         registry=default_registry(),
@@ -31,24 +36,51 @@ async def run_scenario(
         tool_timeout=s.tool_timeout_seconds,
     )
     t0 = time.monotonic()
-    result = await run_agent(sc["input"], ctx)
+    question = REPORT_PROMPT if sc.input == "@report" else sc.input
+    result = await run_agent(question, ctx)
     run = await tracer.get_run(result.run_id)
     called = [x.tool_name for x in run.steps if x.type == "tool_call"]
-    ok = result.status == "completed"
-    ok &= all(t in called for t in sc.get("expected_tools", []))
-    ok &= not any(t in called for t in sc.get("forbidden_tools", []))
-    for needle in sc.get("answer_must_contain", []) or []:
+    ok = result.status == sc.expected_status
+    ok &= all(t in called for t in sc.expected_tools)
+    ok &= not any(t in called for t in sc.forbidden_tools)
+    for needle in sc.answer_must_contain:
         ok &= needle.lower() in result.answer.lower()
+    tin, tout = run.input_tokens, run.output_tokens
+    score = None
+    if sc.rubric:
+        v = await judge_answer(llm, tracer, sc.name, sc.input, result.answer, sc.rubric)
+        score = v.score
+        ok &= score >= sc.min_score
+        tin, tout = tin + v.input_tokens, tout + v.output_tokens
     return {
-        "name": sc["name"],
+        "name": sc.name,
         "ok": bool(ok),
+        "score": score,
         "tools": called,
         "secs": time.monotonic() - t0,
-        "tokens": run.input_tokens + run.output_tokens,
+        "tokens": tin + tout,
+        "cost": estimate_cost(llm.model, tin, tout) or 0.0,
     }
 
 
-async def main() -> int:
+def _skipped(sc: Scenario) -> dict:
+    return {"name": sc.name, "ok": False, "score": None, "tools": [], "secs": 0, "tokens": 0,
+            "cost": 0.0, "skipped": True}  # fmt: skip
+
+
+def print_table(rows: list[dict]) -> None:
+    print(f"{'scenario':<26}{'result':<8}{'score':>6}{'secs':>7}{'tokens':>8}{'cost $':>9}  tools")
+    for r in rows:
+        score = "-" if r["score"] is None else f"{r['score']:.2f}"
+        result = "SKIP" if r.get("skipped") else "PASS" if r["ok"] else "FAIL"
+        print(
+            f"{r['name']:<26}{result:<8}{score:>6}{r['secs']:>7.1f}{r['tokens']:>8}"
+            f"{r['cost']:>9.4f}  {','.join(r['tools']) or '-'}"
+        )
+    print(f"total cost: ${sum(r['cost'] for r in rows):.4f}")
+
+
+async def main(max_cost: float | None) -> int:
     s = get_settings()
     default_catalog = s.products_file
     db_file = Path(tempfile.mkdtemp()) / "evals.db"  # isolated: evals never touch the real DB
@@ -59,20 +91,29 @@ async def main() -> int:
         await c.run_sync(Base.metadata.create_all)
     tracer = Tracer(session_maker())
     llm = AnthropicClient(s.anthropic_api_key, s.anthropic_model)
-    rows = [
-        await run_scenario(
-            yaml.safe_load(p.read_text(encoding="utf-8")), tracer, llm, s, default_catalog
-        )
-        for p in sorted(SCENARIOS.glob("*.yaml"))
-    ]
-    print(f"{'scenario':<20}{'result':<8}{'tools':<30}{'secs':>6}{'tokens':>8}")
-    for r in rows:
-        print(
-            f"{r['name']:<20}{'PASS' if r['ok'] else 'FAIL':<8}{','.join(r['tools']) or '-':<30}"
-            f"{r['secs']:>6.1f}{r['tokens']:>8}"
-        )
-    return 0 if all(r["ok"] for r in rows) else 1
+    scenarios = [load_scenario(p) for p in sorted(SCENARIOS_DIR.glob("*.yaml"))]
+    rows: list[dict] = []
+    spent = 0.0
+    for sc in scenarios:
+        if max_cost is not None and spent >= max_cost:
+            rows.append(_skipped(sc))  # spending cap reached: remaining scenarios count as failed
+            continue
+        row = await run_scenario(sc, tracer, llm, s, default_catalog)
+        spent += row["cost"]
+        rows.append(row)
+    print_table(rows)
+
+    diff = compare(latest_result(RESULTS), rows)
+    save_result(RESULTS, datetime.now().strftime("%Y%m%d-%H%M%S"), llm.model, rows)
+    for label, key in (("REGRESSIONI", "regressions"), ("Risolti", "fixed"), ("Nuovi", "new")):
+        if diff[key]:
+            print(f"{label}: " + "; ".join(diff[key]))
+    if any(r.get("skipped") for r in rows):
+        print(f"ATTENZIONE: tetto di spesa ${max_cost} raggiunto, scenari saltati.")
+    return 0 if all(r["ok"] for r in rows) and not diff["regressions"] else 1
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--max-cost", type=float, default=None, help="USD cap for this run")
+    sys.exit(asyncio.run(main(parser.parse_args().max_cost)))

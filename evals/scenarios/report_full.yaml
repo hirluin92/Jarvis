@@ -1,0 +1,12 @@
+name: report_full
+input: '@report'
+expected_status: completed
+catalog: products.yaml
+expected_tools:
+- site_status
+- github_activity
+forbidden_tools: []
+answer_must_contain: []
+rubric: Italian, at most 15 lines, anomalies listed before numbers, mentions both Demo Up and Demo Down,
+  and contains no invented figures.
+min_score: 0.7

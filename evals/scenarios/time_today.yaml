@@ -1,0 +1,8 @@
+name: time_today
+input: Che giorno è oggi?
+expected_status: completed
+expected_tools:
+- get_current_time
+forbidden_tools: []
+answer_must_contain: []
+min_score: 0.7

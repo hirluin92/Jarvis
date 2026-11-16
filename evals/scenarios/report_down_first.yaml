@@ -1,0 +1,10 @@
+name: report_down_first
+input: '@report'
+expected_status: completed
+catalog: products.yaml
+expected_tools:
+- site_status
+forbidden_tools: []
+answer_must_contain: []
+rubric: The unreachable site Demo Down appears among the anomalies, before any figures.
+min_score: 0.7
