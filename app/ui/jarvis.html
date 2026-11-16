@@ -3,113 +3,182 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#04080d">
+<meta name="theme-color" content="#03060b">
 <title>Jarvis</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%2300d9ff' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2300d9ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#04080d; --bg2:#08121c; --panel:rgba(8,22,34,.72); --line:rgba(0,217,255,.22);
-  --cyan:#00d9ff; --cyan-d:#0a8fa8; --amber:#ffb347; --red:#ff5d73; --green:#3df0a0;
-  --fg:#d9f6ff; --mut:#7fa3b3;
+  --a:0,217,255;            /* accent, set by the theme */
+  --think:255,179,71; --hear:61,240,160; --bad:255,93,115;
+  --bg:#03060b; --fg:#dff8ff; --mut:#7aa2b4;
+  --acc:rgb(var(--a)); --line:rgba(var(--a),.24);
+  --glass:linear-gradient(160deg,rgba(10,28,42,.78),rgba(5,14,22,.66));
+  --display:"Orbitron","Segoe UI",system-ui,sans-serif;
+  --ui:"Rajdhani","Segoe UI",system-ui,-apple-system,sans-serif;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{
-  background:radial-gradient(ellipse at 50% 38%,#0a1d2c 0%,var(--bg) 62%);
-  color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
-  overflow:hidden;-webkit-tap-highlight-color:transparent;
-}
-body::before{ /* faint grid */
-  content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;
-  background:linear-gradient(var(--line) 1px,transparent 1px) 0 0/48px 48px,
-             linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/48px 48px;
-  mask-image:radial-gradient(ellipse at center,#000 0%,transparent 70%);
-  -webkit-mask-image:radial-gradient(ellipse at center,#000 0%,transparent 70%);
-  opacity:.18;
-}
-.app{position:relative;display:grid;height:100%;grid-template-columns:1fr;grid-template-rows:auto 1fr auto;
-  padding:calc(12px + var(--safe-t)) 16px calc(12px + var(--safe-b))}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{font-weight:700;letter-spacing:.42em;color:var(--cyan);text-shadow:0 0 14px rgba(0,217,255,.6)}
-.status{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13px}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mut);flex:none}
-.dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}
-.dot.bad{background:var(--red);box-shadow:0 0 10px var(--red)}
-.dot.warn{background:var(--amber);box-shadow:0 0 10px var(--amber)}
-.iconbtn{background:none;border:1px solid var(--line);color:var(--cyan);border-radius:10px;
-  padding:8px 12px;font:inherit;cursor:pointer}
-.iconbtn:hover,.iconbtn:focus-visible{background:rgba(0,217,255,.1);outline:none}
-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
-.orbwrap{position:relative;width:min(78vw,52vh,520px);aspect-ratio:1}
-canvas{width:100%;height:100%;display:block}
-.state{font-size:13px;letter-spacing:.32em;text-transform:uppercase;color:var(--cyan);min-height:1.4em;text-align:center}
-.state.thinking{color:var(--amber)} .state.bad{color:var(--red)}
-.transcript{width:min(680px,100%);max-height:26vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
-  padding:4px 2px;scrollbar-width:thin;scrollbar-color:var(--cyan-d) transparent}
-.msg{padding:9px 13px;border-radius:12px;max-width:92%;border:1px solid var(--line);background:var(--panel);
-  animation:in .25s ease-out both;word-wrap:break-word}
-.msg.you{align-self:flex-end;border-color:rgba(61,240,160,.3);color:#d6ffe9}
-.msg.jarvis{align-self:flex-start}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.chip{font-size:11.5px;color:var(--amber);border:1px solid rgba(255,179,71,.4);border-radius:99px;padding:2px 9px}
-.msg.alert{border-color:var(--amber);color:var(--amber)}
-@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-footer{display:flex;flex-direction:column;align-items:center;gap:8px}
-.talk{width:76px;height:76px;border-radius:50%;border:2px solid var(--cyan);background:rgba(0,217,255,.08);
-  color:var(--cyan);cursor:pointer;display:grid;place-items:center;transition:.2s;
-  box-shadow:0 0 24px rgba(0,217,255,.35),inset 0 0 18px rgba(0,217,255,.15)}
-.talk:hover,.talk:focus-visible{background:rgba(0,217,255,.18);outline:none;transform:scale(1.04)}
-.talk.live{border-color:var(--red);color:var(--red);box-shadow:0 0 24px rgba(255,93,115,.35),inset 0 0 18px rgba(255,93,115,.15);background:rgba(255,93,115,.08)}
-.talk svg{width:30px;height:30px}
-.hint{color:var(--mut);font-size:12.5px;text-align:center;min-height:1.2em}
+body{background:var(--bg);color:var(--fg);font:500 16px/1.4 var(--ui);overflow:hidden;
+  -webkit-tap-highlight-color:transparent;letter-spacing:.02em}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+body::after{ /* scanlines + vignette */
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+    radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(0,0,0,.55) 100%)}
+.app{position:relative;z-index:1;display:grid;height:100%;grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto 1fr auto;padding:calc(14px + var(--safe-t)) 18px calc(14px + var(--safe-b))}
 
-/* side panels: a column on wide screens, a sheet on phones */
-aside{position:fixed;top:0;right:0;bottom:0;width:min(360px,92vw);background:rgba(4,12,20,.94);
-  border-left:1px solid var(--line);padding:calc(14px + var(--safe-t)) 16px calc(14px + var(--safe-b));
-  overflow-y:auto;transform:translateX(102%);transition:transform .28s ease;backdrop-filter:blur(8px);z-index:5}
+/* corner brackets */
+.corner{position:fixed;width:26px;height:26px;border:2px solid rgba(var(--a),.7);z-index:2;pointer-events:none;
+  filter:drop-shadow(0 0 5px rgba(var(--a),.7))}
+.corner.tl{top:calc(8px + var(--safe-t));left:8px;border-right:0;border-bottom:0}
+.corner.tr{top:calc(8px + var(--safe-t));right:8px;border-left:0;border-bottom:0}
+.corner.bl{bottom:calc(8px + var(--safe-b));left:8px;border-right:0;border-top:0}
+.corner.br{bottom:calc(8px + var(--safe-b));right:8px;border-left:0;border-top:0}
+
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:4px 10px}
+.brand{font:900 22px/1 var(--display);letter-spacing:.5em;color:var(--acc);
+  text-shadow:0 0 18px rgba(var(--a),.8),0 0 2px #fff}
+.sub{font-size:11px;letter-spacing:.38em;color:var(--mut);margin-top:6px;text-transform:uppercase}
+.right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.clock{font:500 22px/1 var(--display);letter-spacing:.12em;color:var(--fg);text-shadow:0 0 12px rgba(var(--a),.5)}
+.date{font-size:11px;letter-spacing:.3em;color:var(--mut);text-transform:uppercase;margin-top:-2px}
+.status{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mut);flex:none}
+.dot.on{background:rgb(var(--hear));box-shadow:0 0 10px rgb(var(--hear))}
+.dot.bad{background:rgb(var(--bad));box-shadow:0 0 10px rgb(var(--bad))}
+.dot.warn{background:rgb(var(--think));box-shadow:0 0 10px rgb(var(--think))}
+.tools{display:flex;gap:10px;align-items:center}
+.themes{display:flex;gap:7px}
+.theme{width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.5);cursor:pointer;padding:0}
+.theme[aria-pressed=true]{box-shadow:0 0 0 2px var(--bg),0 0 0 3px #fff}
+.btn{background:rgba(var(--a),.06);border:1px solid var(--line);color:var(--acc);padding:6px 14px;
+  font:600 12px var(--ui);letter-spacing:.24em;text-transform:uppercase;cursor:pointer;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.btn:hover,.btn:focus-visible{background:rgba(var(--a),.2);outline:none}
+
+main{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;gap:2px}
+.orbwrap{position:relative;width:min(100%,60vh,800px);aspect-ratio:1;flex:none}
+canvas#orb{width:100%;height:100%;display:block}
+.state{font:700 17px var(--display);letter-spacing:.5em;text-indent:.5em;color:var(--acc);text-align:center;
+  text-shadow:0 0 16px rgba(var(--a),.9);min-height:1.4em;transition:color .3s}
+.state.thinking{color:rgb(var(--think));text-shadow:0 0 16px rgba(var(--think),.9)}
+.state.hearing{color:rgb(var(--hear));text-shadow:0 0 16px rgba(var(--hear),.9)}
+.state.bad{color:rgb(var(--bad));text-shadow:0 0 16px rgba(var(--bad),.9)}
+.transcript{width:min(720px,100%);height:clamp(96px,21vh,190px);overflow:hidden;display:flex;flex-direction:column;
+  justify-content:flex-end;gap:7px;padding:6px 2px 2px;margin-top:4px;
+  mask-image:linear-gradient(transparent,#000 22%);-webkit-mask-image:linear-gradient(transparent,#000 22%)}
+.msg{padding:8px 14px;max-width:92%;border:1px solid var(--line);background:var(--glass);font-size:17px;
+  animation:in .35s cubic-bezier(.2,.8,.2,1) both;overflow-wrap:anywhere;position:relative;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.msg.you{align-self:flex-end;border-color:rgba(var(--hear),.5);color:#d8ffec}
+.msg.you::before{content:"TU";display:block;font-size:10px;letter-spacing:.3em;color:rgb(var(--hear));opacity:.85}
+.msg.jarvis{align-self:flex-start;border-left:3px solid var(--acc)}
+.msg.jarvis::before{content:"JARVIS";display:block;font-size:10px;letter-spacing:.3em;color:var(--acc);opacity:.9}
+.msg.alert{border-color:rgb(var(--think));color:rgb(var(--think));align-self:center}
+.msg .w{animation:in .4s ease-out both}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font:600 11px var(--ui);letter-spacing:.14em;text-transform:uppercase;color:rgb(var(--think));
+  border:1px solid rgba(var(--think),.5);padding:1px 8px;background:rgba(var(--think),.08)}
+.msg:nth-last-child(n+3){opacity:.55} .msg:nth-last-child(n+4){opacity:.3}
+@keyframes in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+
+footer{display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:4px}
+.talk{position:relative;width:84px;height:84px;border-radius:50%;border:0;background:radial-gradient(circle,rgba(var(--a),.22),rgba(var(--a),.04) 70%);
+  color:var(--acc);cursor:pointer;display:grid;place-items:center;transition:transform .2s;
+  box-shadow:0 0 28px rgba(var(--a),.35),inset 0 0 20px rgba(var(--a),.2)}
+.talk::before,.talk::after{content:"";position:absolute;inset:-7px;border-radius:50%;pointer-events:none}
+.talk::before{border:2px dashed rgba(var(--a),.55);animation:spin 14s linear infinite}
+.talk::after{inset:0;border:2px solid var(--acc)}
+.talk:hover,.talk:focus-visible{transform:scale(1.06);outline:none}
+.talk.live{color:rgb(var(--bad));background:radial-gradient(circle,rgba(var(--bad),.25),rgba(var(--bad),.04) 70%);
+  box-shadow:0 0 30px rgba(var(--bad),.4),inset 0 0 20px rgba(var(--bad),.2)}
+.talk.live::before{border-color:rgba(var(--bad),.6);animation-duration:5s}
+.talk.live::after{border-color:rgb(var(--bad))}
+.talk svg{width:32px;height:32px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hint{color:var(--mut);font-size:13px;letter-spacing:.14em;text-align:center;min-height:1.3em}
+
+aside{position:fixed;top:0;right:0;bottom:0;width:min(380px,94vw);z-index:6;background:rgba(3,9,15,.92);
+  border-left:1px solid var(--line);padding:calc(18px + var(--safe-t)) 16px calc(18px + var(--safe-b));
+  overflow-y:auto;transform:translateX(104%);transition:transform .3s cubic-bezier(.2,.8,.2,1);backdrop-filter:blur(10px)}
 aside.open{transform:none}
-aside h2{font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--cyan);margin:18px 0 8px}
-aside h2:first-of-type{margin-top:6px}
-.card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:13.5px}
-.row{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:3px 0}
-.row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mut{color:var(--mut)} .small{font-size:12px}
+aside h2{display:flex;align-items:center;gap:10px;font:700 12px var(--display);letter-spacing:.3em;text-transform:uppercase;
+  color:var(--acc);margin:20px 0 10px}
+aside h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+aside h2:first-of-type{margin-top:8px}
+.card{border:1px solid var(--line);border-left:3px solid rgba(var(--a),.8);background:var(--glass);padding:9px 12px;
+  margin-bottom:8px;font-size:15px}
+.card.bad{border-left-color:rgb(var(--bad))} .card.warn{border-left-color:rgb(var(--think))}
+.row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.row .name{display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.mut{color:var(--mut)} .small{font-size:12.5px;letter-spacing:.08em}
+.num{font:500 13px var(--display);letter-spacing:.05em}
 .report{white-space:pre-wrap}
-.close{display:block;margin:0 0 6px auto}
+.close{display:block;margin:0 0 4px auto}
+
 @media(min-width:1000px){
-  .app{grid-template-columns:1fr 340px}
+  .app{grid-template-columns:minmax(0,1fr) 360px}
   header,footer,main{grid-column:1}
-  aside{transform:none;width:340px;z-index:1;background:rgba(4,12,20,.55)}
-  .app>header .iconbtn#panels{display:none}
-  .close{display:none}
+  aside{transform:none;width:360px;z-index:1;background:rgba(3,9,15,.6)}
+  #panels,.close{display:none}
+}
+@media(max-width:620px){
+  header{flex-wrap:wrap;align-items:center;row-gap:10px}
+  .right{display:contents}
+  .brand{font-size:18px;letter-spacing:.4em} .sub,.date{display:none}
+  .clock{font-size:18px;margin-left:auto}
+  .tools{flex-basis:100%;justify-content:space-between;gap:8px}
+  .status{font-size:11px;letter-spacing:.12em}
+  .btn{padding:6px 10px;letter-spacing:.16em}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
 <div class="app">
   <header>
-    <div class="brand">JARVIS</div>
-    <div class="status"><span class="dot" id="dot"></span><span id="conn">offline</span>
-      <button class="iconbtn" id="panels" aria-label="Apri i pannelli">Pannelli</button></div>
+    <div>
+      <div class="brand">JARVIS</div>
+      <div class="sub">Assistente personale</div>
+    </div>
+    <div class="right">
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date"></div>
+      <div class="tools">
+        <div class="themes" role="group" aria-label="Colore">
+          <button class="theme" data-t="cyan" style="background:#00d9ff" aria-label="Ciano" aria-pressed="true"></button>
+          <button class="theme" data-t="gold" style="background:#ffbe3c" aria-label="Oro" aria-pressed="false"></button>
+          <button class="theme" data-t="violet" style="background:#a678ff" aria-label="Viola" aria-pressed="false"></button>
+          <button class="theme" data-t="ice" style="background:#cfe6ff" aria-label="Ghiaccio" aria-pressed="false"></button>
+        </div>
+        <div class="status"><span class="dot" id="dot"></span><span id="conn">offline</span></div>
+        <button class="btn" id="panels">Pannelli</button>
+      </div>
+    </div>
   </header>
 
   <main>
     <div class="orbwrap"><canvas id="orb" aria-hidden="true"></canvas></div>
-    <div class="state" id="state" role="status" aria-live="polite">Offline</div>
+    <div class="state" id="state" role="status" aria-live="polite">OFFLINE</div>
     <div class="transcript" id="log" aria-live="polite" aria-label="Conversazione"></div>
   </main>
 
   <footer>
     <button class="talk" id="talk" aria-label="Collegati e parla con Jarvis">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
     </button>
     <div class="hint" id="hint">Tocca il microfono per iniziare</div>
   </footer>
 
   <aside id="side" aria-label="Pannelli">
-    <button class="iconbtn close" id="close">Chiudi</button>
+    <button class="btn close" id="close">Chiudi</button>
     <h2>Siti</h2><div id="sites"><div class="card mut">Caricamento…</div></div>
     <h2>In attesa di conferma</h2><div id="waiting"></div>
     <h2>Report del mattino</h2><div id="report"></div>
@@ -120,87 +189,103 @@ aside h2:first-of-type{margin-top:6px}
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-const els = {orb:$("orb"), state:$("state"), log:$("log"), talk:$("talk"), hint:$("hint"),
+const els = {orb:$("orb"), bg:$("bg"), state:$("state"), log:$("log"), talk:$("talk"), hint:$("hint"),
   dot:$("dot"), conn:$("conn"), side:$("side")};
+const DEMO = new URLSearchParams(location.search).has("demo");
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- themes ---------- */
+const THEMES = {cyan:{a:[0,217,255], think:[255,179,71]}, gold:{a:[255,190,60], think:[80,200,255]},
+  violet:{a:[166,120,255], think:[255,179,71]}, ice:{a:[207,230,255], think:[255,179,71]}};
+let theme = THEMES.cyan;
+function applyTheme(name) {
+  theme = THEMES[name] || THEMES.cyan;
+  const r = document.documentElement.style;
+  r.setProperty("--a", theme.a.join(",")); r.setProperty("--think", theme.think.join(","));
+  document.querySelectorAll(".theme").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === name)));
+  try { localStorage.setItem("jarvis_theme", name); } catch {}
+}
+document.querySelectorAll(".theme").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.t)));
+try { applyTheme(localStorage.getItem("jarvis_theme") || "cyan"); } catch { applyTheme("cyan"); }
+
+/* ---------- clock ---------- */
+function tick() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"});
+  $("date").textContent = d.toLocaleDateString("it-IT", {weekday:"short", day:"numeric", month:"short"});
+}
+tick(); setInterval(tick, 10000);
 
 /* ---------- state ---------- */
-const LABELS = {offline:"Offline", connecting:"Mi collego…", listening:"In ascolto",
-  hearing:"Ti sento", thinking:"Ci penso", speaking:"Parlo", error:"Errore"};
-let mode = "offline", live = false, mutedHint = false;
+const LABELS = {offline:"OFFLINE", connecting:"COLLEGAMENTO", listening:"IN ASCOLTO", hearing:"TI SENTO",
+  thinking:"ELABORO", speaking:"PARLO", error:"ERRORE"};
+let mode = "offline", live = false, bootAt = 0, latency = null, heardAt = 0;
 function setMode(m, detail) {
   mode = m;
   els.state.textContent = detail || LABELS[m] || m;
-  els.state.className = "state" + (m === "thinking" ? " thinking" : m === "error" ? " bad" : "");
+  els.state.className = "state" + ({thinking:" thinking", hearing:" hearing", error:" bad"}[m] || "");
   els.dot.className = "dot" + (live ? (m === "error" ? " bad" : " on") : m === "connecting" ? " warn" : "");
   els.conn.textContent = live ? "connesso" : m === "connecting" ? "collego" : "offline";
 }
 
 /* ---------- transcript ---------- */
-let current = null; // the Jarvis bubble being written
+let current = null;
 function bubble(cls, text) {
   const d = document.createElement("div");
   d.className = "msg " + cls;
-  const t = document.createElement("span");
-  t.textContent = text;
-  d.appendChild(t);
-  els.log.appendChild(d);
-  while (els.log.children.length > 24) els.log.removeChild(els.log.firstChild);
-  els.log.scrollTop = els.log.scrollHeight;
+  const t = document.createElement("span"); t.className = "txt"; t.textContent = text;
+  d.appendChild(t); els.log.appendChild(d);
+  while (els.log.children.length > 6) els.log.removeChild(els.log.firstChild);
   return d;
 }
-function addChips(node, names) {
-  const wrap = document.createElement("div");
-  wrap.className = "chips";
-  for (const n of [...new Set(names)]) {
-    const c = document.createElement("span");
-    c.className = "chip"; c.textContent = n;
-    wrap.appendChild(c);
+function addWords(node, text) {
+  const t = node.querySelector(".txt");
+  if (t.textContent === "…") t.textContent = "";
+  for (const w of text.split(" ")) {
+    const s = document.createElement("span"); s.className = "w"; s.textContent = (t.textContent ? " " : "") + w;
+    t.appendChild(s);
   }
+}
+function addChips(node, names) {
+  const wrap = document.createElement("div"); wrap.className = "chips";
+  for (const n of [...new Set(names)]) { const c = document.createElement("span"); c.className = "chip"; c.textContent = n; wrap.appendChild(c); }
   node.appendChild(wrap);
 }
 
-/* ---------- server events (what Jarvis is doing) ---------- */
+/* ---------- events (from the server, or from the demo) ---------- */
 let speakingUntil = 0;
+function handle(e) {
+  if (e.type === "heard") { current = null; bubble("you", e.text); heardAt = performance.now(); latency = null; }
+  else if (e.type === "thinking") { if (live) setMode("thinking"); }
+  else if (e.type === "say") {
+    if (!current) current = bubble("jarvis", "");
+    addWords(current, e.text);
+    if (heardAt && latency === null) latency = (performance.now() - heardAt) / 1000;
+    if (live) setMode("speaking");
+    speakingUntil = performance.now() + 1500;
+  }
+  else if (e.type === "tools") { if (!current) current = bubble("jarvis", "…"); addChips(current, e.names); }
+  else if (e.type === "pending") { bubble("alert", "Conferma richiesta su Telegram: " + e.text); loadData(); }
+  else if (e.type === "interrupted") { current = null; if (live) setMode("listening"); }
+  else if (e.type === "done") { current = null; loadData(); }
+}
 function startEvents() {
   const es = new EventSource("/jarvis/events");
-  es.onmessage = (m) => {
-    let e; try { e = JSON.parse(m.data); } catch { return; }
-    if (e.type === "heard") { current = null; bubble("you", e.text); }
-    else if (e.type === "thinking") { if (live) setMode("thinking"); }
-    else if (e.type === "say") {
-      if (!current) current = bubble("jarvis", "");
-      const s = current.firstChild; s.textContent += (s.textContent ? " " : "") + e.text;
-      els.log.scrollTop = els.log.scrollHeight;
-      if (live) setMode("speaking");
-      speakingUntil = performance.now() + 1500;
-    }
-    else if (e.type === "tools") {
-      if (!current) current = bubble("jarvis", "…");
-      addChips(current, e.names);
-    }
-    else if (e.type === "pending") { bubble("alert", "Conferma richiesta su Telegram: " + e.text); loadData(); }
-    else if (e.type === "interrupted") { current = null; if (live) setMode("listening"); }
-    else if (e.type === "done") { current = null; loadData(); }
-  };
+  es.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch {} };
 }
 
 /* ---------- WebRTC ---------- */
 let pc = null, stream = null, audioCtx = null, micAn = null, outAn = null, wake = null;
 const player = new Audio(); player.autoplay = true; player.playsInline = true;
-
-function analyser(mediaStream) {
-  const src = audioCtx.createMediaStreamSource(mediaStream);
-  const an = audioCtx.createAnalyser();
-  an.fftSize = 256; an.smoothingTimeConstant = 0.75;
-  src.connect(an); // not connected to the speakers: playback goes through <audio>
-  return an;
+function analyser(ms) {
+  const src = audioCtx.createMediaStreamSource(ms), an = audioCtx.createAnalyser();
+  an.fftSize = 256; an.smoothingTimeConstant = 0.7; src.connect(an); return an;
 }
 async function waitIce(p) {
   if (p.iceGatheringState === "complete") return;
   await new Promise((ok) => {
     const done = () => { if (p.iceGatheringState === "complete") { p.removeEventListener("icegatheringstatechange", done); ok(); } };
-    p.addEventListener("icegatheringstatechange", done);
-    setTimeout(ok, 3000);
+    p.addEventListener("icegatheringstatechange", done); setTimeout(ok, 3000);
   });
 }
 async function connect() {
@@ -214,32 +299,24 @@ async function connect() {
       body: JSON.stringify({enableDefaultIceServers:true})})).json();
     pc = new RTCPeerConnection({iceServers: (start.iceConfig && start.iceConfig.iceServers) || []});
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-    pc.ontrack = (ev) => {
-      player.srcObject = ev.streams[0];
-      player.play().catch(() => {});
-      outAn = analyser(ev.streams[0]);
-    };
+    pc.ontrack = (ev) => { player.srcObject = ev.streams[0]; player.play().catch(() => {}); outAn = analyser(ev.streams[0]); };
     pc.onconnectionstatechange = () => {
-      if (["failed", "disconnected", "closed"].includes(pc && pc.connectionState)) {
-        if (live) disconnect("Collegamento perso");
-      }
+      if (["failed", "disconnected", "closed"].includes(pc && pc.connectionState) && live) disconnect("Collegamento perso");
     };
     await pc.setLocalDescription(await pc.createOffer());
     await waitIce(pc);
-    const res = await fetch(`/sessions/${start.sessionId}/api/offer`, {method:"POST",
-      headers:{"Content-Type":"application/json"},
+    const res = await fetch(`/sessions/${start.sessionId}/api/offer`, {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({sdp: pc.localDescription.sdp, type: pc.localDescription.type})});
     if (!res.ok) throw new Error("offerta rifiutata (" + res.status + ")");
     const ans = await res.json();
     await pc.setRemoteDescription({sdp: ans.sdp, type: ans.type});
-    live = true; els.talk.classList.add("live");
+    live = true; bootAt = performance.now(); els.talk.classList.add("live");
     els.talk.setAttribute("aria-label", "Scollegati");
     els.hint.textContent = "Parla pure. Tocca di nuovo per chiudere";
     setMode("listening");
     try { wake = await navigator.wakeLock.request("screen"); } catch {}
   } catch (err) {
-    disconnect(null);
-    setMode("error", "Errore");
+    disconnect(null); setMode("error");
     els.hint.textContent = (err && err.name === "NotAllowedError")
       ? "Microfono negato: abilitalo nelle impostazioni del browser"
       : "Non riesco a collegarmi: " + (err && err.message || err);
@@ -251,119 +328,238 @@ function disconnect(msg) {
   stream && stream.getTracks().forEach((t) => t.stop());
   player.srcObject = null; pc = stream = micAn = outAn = null;
   try { wake && wake.release(); } catch {}
-  els.talk.classList.remove("live");
-  els.talk.setAttribute("aria-label", "Collegati e parla con Jarvis");
-  setMode("offline");
-  els.hint.textContent = msg || "Tocca il microfono per iniziare";
+  els.talk.classList.remove("live"); els.talk.setAttribute("aria-label", "Collegati e parla con Jarvis");
+  setMode("offline"); els.hint.textContent = msg || "Tocca il microfono per iniziare";
 }
-els.talk.addEventListener("click", () => (live || mode === "connecting") ? disconnect() : connect());
+els.talk.addEventListener("click", () => {
+  if (DEMO) return;
+  (live || mode === "connecting") ? disconnect() : connect();
+});
+
+/* ---------- demo: every state without speaking (?demo=1) ---------- */
+const demo = {in:0, out:0};
+if (DEMO) {
+  live = true; bootAt = performance.now(); els.talk.classList.add("live"); setMode("listening");
+  els.hint.textContent = "Modalità demo";
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  (async function loop() {
+    for (;;) {
+      await wait(1500);
+      const t0 = performance.now(); setMode("hearing");
+      const hearing = setInterval(() => { demo.in = 0.35 + 0.4 * Math.abs(Math.sin((performance.now() - t0) / 120)); }, 40);
+      await wait(2300); clearInterval(hearing); demo.in = 0;
+      handle({type:"heard", text:"Che ore sono a Tokyo e il sito di Jarvis risponde?"});
+      handle({type:"thinking"}); await wait(1600);
+      handle({type:"tools", names:["get_current_time", "site_status"]});
+      const t1 = performance.now();
+      const talking = setInterval(() => { demo.out = 0.25 + 0.5 * Math.abs(Math.sin((performance.now() - t1) / 110)) * Math.random(); }, 50);
+      handle({type:"say", text:"A Tokyo sono le sette e due."}); await wait(2200);
+      handle({type:"say", text:"Il sito risponde in ottanta millisecondi."}); await wait(2600);
+      clearInterval(talking); demo.out = 0; handle({type:"done"}); setMode("listening");
+      await wait(5000);
+    }
+  })();
+}
+
+/* ---------- background dust ---------- */
+const bg = els.bg.getContext("2d");
+let bw = 0, bh = 0, dust = [];
+function sizeBg() {
+  const d = Math.min(devicePixelRatio || 1, 2);
+  bw = els.bg.width = innerWidth * d; bh = els.bg.height = innerHeight * d;
+  dust = Array.from({length: Math.round(bw * bh / 26000)}, () => ({x: Math.random() * bw, y: Math.random() * bh,
+    z: Math.random(), s: (0.4 + Math.random() * 1.6) * d}));
+}
+addEventListener("resize", sizeBg); sizeBg();
 
 /* ---------- orb ---------- */
 const ctx = els.orb.getContext("2d");
 let W = 0, H = 0, dpr = 1;
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  dpr = Math.min(devicePixelRatio || 1, 2);
   const r = els.orb.getBoundingClientRect();
   W = els.orb.width = Math.round(r.width * dpr); H = els.orb.height = Math.round(r.height * dpr);
 }
 new ResizeObserver(resize).observe(els.orb); resize();
+
+const NP = innerWidth < 600 ? 650 : 1100;
+const sphere = Array.from({length: NP}, (_, i) => {
+  const y = 1 - (i / (NP - 1)) * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963;
+  return {x: Math.cos(th) * r, y, z: Math.sin(th) * r, seed: Math.random() * 6.28, bin: 2 + Math.floor((y + 1) / 2 * 40)};
+});
+const SPEC = 64, spec = new Float32Array(SPEC);
+function readSpec(an, t, lvl) {
+  if (DEMO || !an) {
+    for (let k = 0; k < SPEC; k++) spec[k] += ((lvl > 0.02 ? lvl * (0.45 + 0.55 * Math.abs(Math.sin(k * 0.55 + t * 7))) : 0) - spec[k]) * 0.35;
+    return;
+  }
+  const buf = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(buf);
+  for (let k = 0; k < SPEC; k++) spec[k] += (buf[2 + (k % 56)] / 255 - spec[k]) * 0.35;
+}
 function level(an) {
   if (!an) return 0;
-  const buf = new Uint8Array(an.frequencyBinCount);
-  an.getByteFrequencyData(buf);
+  const buf = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(buf);
   let s = 0; for (let i = 2; i < 40; i++) s += buf[i];
   return Math.min(1, s / (38 * 150));
 }
-const spectrum = new Float32Array(96);
-let lvlIn = 0, lvlOut = 0, t0 = performance.now();
-const COLORS = {offline:[60,110,125], connecting:[255,179,71], listening:[0,217,255], hearing:[61,240,160],
-  thinking:[255,179,71], speaking:[120,240,255], error:[255,93,115]};
+const lerp = (a, b, k) => a + (b - a) * k;
+const cur = {c:[60, 110, 125]};
+let lvlIn = 0, lvlOut = 0, last = performance.now(), spin = 0, energySm = 0;
+
 function frame(now) {
-  const t = (now - t0) / 1000;
-  lvlIn += (level(micAn) - lvlIn) * 0.3;
-  lvlOut += (level(outAn) - lvlOut) * 0.3;
-  // derive "hearing"/"speaking" from the audio itself when the server says nothing
-  if (live && mode === "listening" && lvlIn > 0.18) setMode("hearing");
-  else if (live && mode === "hearing" && lvlIn < 0.1) setMode("listening");
-  if (live && mode === "listening" && lvlOut > 0.12) setMode("speaking");
-  else if (live && mode === "speaking" && lvlOut < 0.04 && now > speakingUntil) setMode("listening");
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t = now / 1000, mot = REDUCED ? 0.25 : 1;
+  lvlIn = lerp(lvlIn, DEMO ? demo.in : level(micAn), 0.3);
+  lvlOut = lerp(lvlOut, DEMO ? demo.out : level(outAn), 0.3);
+  if (!DEMO) {
+    if (live && mode === "listening" && lvlIn > 0.18) setMode("hearing");
+    else if (live && mode === "hearing" && lvlIn < 0.1) setMode("listening");
+    if (live && mode === "listening" && lvlOut > 0.12) setMode("speaking");
+    else if (live && mode === "speaking" && lvlOut < 0.04 && now > speakingUntil) setMode("listening");
+  }
+  // colour eases toward the one of the state
+  const target = {offline:[70, 120, 135], connecting:theme.think, listening:theme.a, hearing:[61, 240, 160],
+    thinking:theme.think, speaking:theme.a, error:[255, 93, 115]}[mode] || theme.a;
+  for (let i = 0; i < 3; i++) cur.c[i] = lerp(cur.c[i], target[i], 0.08);
+  const C = cur.c.map(Math.round), col = (a) => `rgba(${C[0]},${C[1]},${C[2]},${a})`;
 
-  const c = COLORS[mode] || COLORS.offline, col = (a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-  const energy = mode === "speaking" ? lvlOut : mode === "hearing" ? lvlIn : mode === "thinking" ? 0.35 + 0.15 * Math.sin(t * 6) : 0.06 + 0.03 * Math.sin(t * 1.6);
-  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.27;
+  const lvl = mode === "speaking" ? lvlOut : mode === "hearing" ? lvlIn : 0;
+  const energy = mode === "thinking" ? 0.35 + 0.2 * Math.sin(t * 7) : lvl;
+  energySm = lerp(energySm, energy, 0.25);
+  readSpec(mode === "speaking" ? outAn : micAn, t, lvl);
+  const boot = live ? Math.min(1, (now - bootAt) / 1500) : 0;           // 0 → 1 after connecting
+  const awake = lerp(0.55, 1, boot);
+  spin += dt * (mode === "thinking" ? 2.2 : mode === "speaking" ? 0.7 : 0.28) * mot;
+
+  /* background dust */
+  bg.clearRect(0, 0, bw, bh);
+  const bgGrad = bg.createRadialGradient(bw / 2, bh * 0.46, 0, bw / 2, bh * 0.46, Math.max(bw, bh) * 0.7);
+  bgGrad.addColorStop(0, col(0.16)); bgGrad.addColorStop(0.5, "rgba(4,12,20,.55)"); bgGrad.addColorStop(1, "rgba(3,6,11,1)");
+  bg.fillStyle = bgGrad; bg.fillRect(0, 0, bw, bh);
+  for (const p of dust) {
+    p.y -= (0.08 + p.z * 0.25) * mot * (1 + energySm * 3); if (p.y < -4) { p.y = bh + 4; p.x = Math.random() * bw; }
+    bg.fillStyle = col(0.12 + p.z * 0.5); bg.fillRect(p.x, p.y, p.s, p.s);
+  }
+
+  /* orb */
   ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.235 * (0.9 + 0.1 * awake);
+  ctx.globalCompositeOperation = "lighter";
 
-  // glow
-  const g = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, Math.min(W, H) / 2);
-  g.addColorStop(0, col(0.30 + energy * 0.4)); g.addColorStop(0.55, col(0.07)); g.addColorStop(1, col(0));
+  // outer glow
+  const g = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, W / 2);
+  g.addColorStop(0, col(0.26 * awake + energySm * 0.3)); g.addColorStop(0.5, col(0.06)); g.addColorStop(1, col(0));
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-  // static + rotating rings
-  ctx.lineWidth = 1.5 * dpr;
-  const spin = mode === "thinking" ? 2.4 : 0.35;
-  for (let i = 0; i < 3; i++) {
-    const rr = R * (1.35 + i * 0.22), a0 = t * spin * (i % 2 ? -1 : 1) + i;
-    ctx.strokeStyle = col(0.45 - i * 0.1); ctx.setLineDash([R * (0.35 - i * 0.07), R * (0.18 + i * 0.1)]);
-    ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a0 + Math.PI * 2); ctx.stroke();
+  // radar sweep
+  if (ctx.createConicGradient && boot > 0) {
+    const a0 = (t * 0.9 * mot) % 6.2832, cg = ctx.createConicGradient(a0, cx, cy);
+    cg.addColorStop(0, col(0)); cg.addColorStop(0.9, col(0)); cg.addColorStop(1, col(0.22 * boot));
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, R * 1.62, 0, 6.2832); ctx.fill();
   }
-  ctx.setLineDash([]);
 
-  // reactive spectrum ring
-  const src = mode === "speaking" ? outAn : micAn;
-  const N = spectrum.length, buf = src ? new Uint8Array(src.frequencyBinCount) : null;
-  if (src) src.getByteFrequencyData(buf);
-  ctx.beginPath();
-  for (let i = 0; i <= N; i++) {
-    const k = i % N, v = buf ? buf[2 + (k % 48)] / 255 : 0;
-    spectrum[k] += (v - spectrum[k]) * 0.35;
-    const a = (k / N) * Math.PI * 2 - Math.PI / 2;
-    const amp = R * (1 + 0.10 * Math.sin(t * 2 + k * 0.4) * (0.4 + energy) + spectrum[k] * 0.55 * (mode === "offline" ? 0.2 : 1));
-    const x = cx + Math.cos(a) * amp, y = cy + Math.sin(a) * amp;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  // tick ring
+  ctx.lineCap = "butt";
+  const rot = spin * 0.6;
+  for (const [n, len, w, a] of [[180, 0.035, 1, 0.5], [36, 0.07, 2, 0.9]]) {
+    ctx.beginPath(); ctx.lineWidth = w * dpr; ctx.strokeStyle = col(a * awake);
+    for (let i = 0; i < n; i++) {
+      const an = rot + (i / n) * 6.2832, r0 = R * 1.34 * (0.85 + 0.15 * boot), r1 = r0 + R * len;
+      ctx.moveTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0); ctx.lineTo(cx + Math.cos(an) * r1, cy + Math.sin(an) * r1);
+    }
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.strokeStyle = col(0.95); ctx.lineWidth = 2.5 * dpr; ctx.shadowColor = col(1); ctx.shadowBlur = 18 * dpr; ctx.stroke();
-  ctx.shadowBlur = 0;
+  // segmented arcs
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i++) {
+    const rr = R * (1.5 + i * 0.1) * (0.9 + 0.1 * boot), dir = i % 2 ? -1 : 1, a0 = spin * (0.8 + i * 0.5) * dir + i * 2;
+    ctx.lineWidth = (i === 1 ? 3.5 : 2) * dpr; ctx.strokeStyle = col((0.7 - i * 0.18) * awake);
+    ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a0 + 1.5 - i * 0.35); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, rr, a0 + 3.1, a0 + 3.9 + i * 0.2); ctx.stroke();
+  }
+  // level arc (how loud the active voice is)
+  ctx.lineWidth = 4 * dpr; ctx.strokeStyle = col(0.95);
+  ctx.beginPath(); ctx.arc(cx, cy, R * 1.28, -1.5708, -1.5708 + Math.max(0.02, energySm) * 6.2832); ctx.stroke();
+
+  // spectrum bars
+  const BARS = 72;
+  ctx.lineWidth = 3 * dpr; ctx.strokeStyle = col(0.9);
+  ctx.beginPath();
+  for (let i = 0; i < BARS; i++) {
+    const an = (i / BARS) * 6.2832 - 1.5708, v = spec[Math.min(SPEC - 1, Math.abs(((i + BARS / 2) % BARS) - BARS / 2) * 2 % SPEC)];
+    const r0 = R * 1.12, r1 = r0 + R * (0.03 + v * 0.34);
+    ctx.moveTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0); ctx.lineTo(cx + Math.cos(an) * r1, cy + Math.sin(an) * r1);
+  }
+  ctx.stroke();
+
+  // particle sphere
+  const ry = spin * 0.9, rx = 0.45 + Math.sin(t * 0.3 * mot) * 0.12, cyw = Math.cos(ry), syw = Math.sin(ry), cxw = Math.cos(rx), sxw = Math.sin(rx);
+  const swirl = mode === "thinking" ? 0.35 : 0;
+  const base = R * (0.86 + 0.04 * Math.sin(t * 1.3 * mot)) * (mode === "thinking" ? 0.88 + 0.06 * Math.sin(t * 8) : 1) * lerp(0.7, 1, boot);
+  ctx.fillStyle = col(1);
+  for (const p of sphere) {
+    const wob = 1 + spec[p.bin % SPEC] * 0.42 * (mode === "offline" ? 0.2 : 1) + 0.03 * Math.sin(p.seed + t * 2 * mot);
+    let x = p.x, y = p.y, z = p.z;
+    if (swirl) { const s = Math.sin(t * 3 + y * 4) * swirl, c = Math.cos(s); const nx = x * c - z * Math.sin(s); z = x * Math.sin(s) + z * c; x = nx; }
+    const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw;            // spin around the vertical axis
+    const y2 = y * cxw - z1 * sxw, z2 = y * sxw + z1 * cxw;           // tilt
+    const persp = 1 / (1 - z2 * 0.3), px = cx + x1 * base * wob * persp, py = cy + y2 * base * wob * persp;
+    const depth = (z2 + 1) / 2;
+    ctx.globalAlpha = (0.12 + 0.85 * depth) * awake;
+    const s = (0.8 + depth * 1.9) * dpr; ctx.fillRect(px - s / 2, py - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1;
 
   // core
-  const cr = R * (0.38 + energy * 0.22);
-  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
-  core.addColorStop(0, "rgba(255,255,255,.95)"); core.addColorStop(0.35, col(0.9)); core.addColorStop(1, col(0));
-  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+  const cr = R * (0.34 + energySm * 0.3) * lerp(0.5, 1, boot);
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr * 1.6);
+  core.addColorStop(0, "rgba(255,255,255,.95)"); core.addColorStop(0.25, col(0.85)); core.addColorStop(1, col(0));
+  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, cr * 1.6, 0, 6.2832); ctx.fill();
+
+  // readouts (only true values)
+  ctx.globalCompositeOperation = "source-over";
+  ctx.font = `600 ${Math.round(11 * dpr)}px Rajdhani, system-ui, sans-serif`; ctx.fillStyle = col(0.85);
+  const m = W * 0.035, top = cy - R * 1.72, bot = cy + R * 1.78;  // four HUD corners around the orb
+  const lab = (txt, x, y, align) => { ctx.textAlign = align; ctx.fillText(txt, x, y); };
+  lab("LINK  " + (live ? "ATTIVO" : "SPENTO"), m, top, "left");
+  lab("LATENZA  " + (latency === null ? "--" : latency.toFixed(1) + " s"), W - m, top, "right");
+  lab("MIC  " + String(Math.round(lvlIn * 100)).padStart(2, "0") + "%", m, bot, "left");
+  lab("VOCE  " + String(Math.round(lvlOut * 100)).padStart(2, "0") + "%", W - m, bot, "right");
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 /* ---------- panels ---------- */
-const STATUS = {completed:"fatto", awaiting_confirmation:"in attesa di conferma", failed:"errore", error:"errore", max_iterations:"interrotto"};
 function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 function hhmm(iso) { return new Date(iso).toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"}); }
+const STATUS = {completed:"fatto", awaiting_confirmation:"in attesa di conferma", failed:"errore", error:"errore", max_iterations:"interrotto"};
 async function loadData() {
   let d; try { const r = await fetch("/jarvis/data"); if (!r.ok) return; d = await r.json(); } catch { return; }
   const sites = $("sites"); sites.replaceChildren();
   if (!d.sites.length) sites.append(el("div", "card mut", "Nessun sito configurato"));
   for (const s of d.sites) {
-    const row = el("div", "card row");
-    const left = el("div", "name"); left.append(el("span", "dot " + (s.ok ? "on" : "bad")), " ", s.product);
-    const right = el("div", "mut small", s.ok ? (s.ms != null ? s.ms + " ms" : "ok") : "non risponde");
+    const row = el("div", "card row" + (s.ok ? "" : " bad"));
+    const left = el("div", "name"); left.append(el("span", "dot " + (s.ok ? "on" : "bad")), s.product);
+    const right = el("div", "mut small num", s.ok ? (s.ms != null ? s.ms + " ms" : "ok") : "non risponde");
     if (s.cert_days != null && s.cert_days < 21) right.textContent += " · cert " + s.cert_days + " g";
     row.append(left, right); sites.append(row);
   }
   const w = $("waiting"); w.replaceChildren();
   if (!d.waiting.length) w.append(el("div", "card mut", "Niente in attesa"));
-  for (const r of d.waiting) w.append(el("div", "card", r.message + " — conferma su Telegram"));
+  for (const r of d.waiting) w.append(el("div", "card warn", r.message + " — conferma su Telegram"));
   const rp = $("report"); rp.replaceChildren();
-  rp.append(d.report ? (() => { const c = el("div", "card"); c.append(el("div", "mut small", hhmm(d.report.at)), el("div", "report", d.report.answer)); return c; })()
-    : el("div", "card mut", "Ancora nessun report"));
+  if (d.report) { const c = el("div", "card"); c.append(el("div", "mut small num", hhmm(d.report.at)), el("div", "report", d.report.answer)); rp.append(c); }
+  else rp.append(el("div", "card mut", "Ancora nessun report"));
   const rc = $("recent"); rc.replaceChildren();
-  for (const r of d.recent) { const c = el("div", "card"); c.append(el("div", "mut small", hhmm(r.at) + " · " + (STATUS[r.status] || r.status)), el("div", "", r.message)); rc.append(c); }
+  for (const r of d.recent) { const c = el("div", "card"); c.append(el("div", "mut small num", hhmm(r.at) + " · " + (STATUS[r.status] || r.status)), el("div", "", r.message)); rc.append(c); }
   if (!d.realtime && !live) els.hint.textContent = "Voce in tempo reale non attiva (REALTIME_VOICE)";
 }
 $("panels").addEventListener("click", () => els.side.classList.add("open"));
 $("close").addEventListener("click", () => els.side.classList.remove("open"));
 setInterval(loadData, 30000);
 
-startEvents(); loadData(); setMode("offline");
+if (!DEMO) startEvents();
+loadData(); if (!DEMO) setMode("offline");
 </script>
 </body>
 </html>

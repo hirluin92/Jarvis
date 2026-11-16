@@ -296,5 +296,9 @@ pannelli (siti, conferme in attesa, report, attività). Collegamento WebRTC dire
 endpoint della voce. Provata in Chrome con microfono finto (connessione, nessun errore di pagina,
 riconnessione immediata) e in versione telefono (screenshot); il comportamento con la tua voce
 reale va guardato dal vivo. Le chiamate nuove sostituiscono una sessione vecchia ancora aperta
-(prima davano 400 dopo una caduta di rete). Limiti: nessun pulsante di conferma sulla pagina
+(prima davano 400 dopo una caduta di rete). Seconda versione grafica (stesso giorno): sfera di particelle 3D che reagisce allo spettro della voce,
+anelli HUD con tacche e radar, barre dello spettro, polvere luminosa sullo sfondo, scritte tecniche
+(Orbitron/Rajdhani da Google Fonts, con caratteri di riserva), 4 temi di colore (ciano, oro, viola,
+ghiaccio; scelta ricordata), orologio, trascrizione a vetro con strumenti usati. `?demo=1` mostra
+tutti gli stati senza parlare. Limiti: nessun pulsante di conferma sulla pagina
 (solo Telegram); ancora nessuna installazione come app (PWA).
