@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     tool_timeout_seconds: float = 30
     github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
     github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_refresh_token: str = ""
     products_file: str = "config/products.yaml"
     report_time: time = time(7, 30)
     report_timezone: str = "Europe/Rome"

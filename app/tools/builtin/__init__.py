@@ -2,11 +2,13 @@ from app.tools.builtin import (
     add_todo,
     create_github_issue,
     create_note,
+    draft_email,
     echo_confirm_demo,
     get_current_time,
     github_activity,
     http_health_check,
     merge_pull_request,
+    send_email,
     site_status,
 )
 from app.tools.registry import ToolRegistry
@@ -24,6 +26,8 @@ def default_registry() -> ToolRegistry:
         add_todo,
         create_github_issue,
         merge_pull_request,
+        draft_email,
+        send_email,
     ):
         reg.register(mod.TOOL)
     return reg
