@@ -168,7 +168,39 @@ Limiti noti:
 
 Eval: 41 scenari, tutti PASS, 166 s, circa $0.55 per esecuzione (il prompt è cresciuto con i tool).
 
-## Fase 6 — Voce: IN CORSO, solo il benchmark (2026-11-16)
+## Fase 6 — Voce: IN CORSO, passo 1 fatto (2026-11-16)
+
+### Decisione sui fornitori (dopo la prova con la voce dell'utente, 8 registrazioni)
+
+- **Trascrizione: ElevenLabs Scribe** (`STT_PROVIDER=elevenlabs`). Errore medio 3,4% sulle
+  registrazioni vere, contro 17,6% di Deepgram Nova-3 e 16,0% di Cartesia Ink-Whisper. Decisivo
+  "No, annulla.": Deepgram e Cartesia sentono "No, a nulla" (100% di errore), Scribe lo trascrive
+  giusto. Scribe è però il più lento in batch (0,60 s contro 0,19-0,22 s): il ritardo vero in
+  streaming si misura nel passo 2.
+- **Voce: Cartesia Sonic 3.6, voce Lorenzo** (scelta dell'utente all'ascolto; è nativa italiana
+  e ha il primo audio più rapido, 86 ms). Il piano gratuito vale circa 27 minuti di voce al mese:
+  per un uso quotidiano serve il Pro (5 dollari al mese).
+- Tutto è configurabile da `.env` (`STT_PROVIDER`, `TTS_PROVIDER`, `TTS_VOICE`, `TTS_MODEL`).
+
+Il campione è piccolo (8 frasi): la scelta si regge sul caso di "annulla" e sul divario ampio, non
+sulle differenze di pochi punti. Alcune "differenze" sono di formato, non di ascolto: Scribe scrive
+"9:00" dove si è detto "nove". Un errore comune a Deepgram e Scribe ("trasferita/sono trasferito")
+può essere la voce registrata e non il servizio.
+
+### Passo 1: messaggi vocali su Telegram (fatto)
+
+Il bot accetta i vocali: li trascrive e mostra cosa ha capito (🎤 «…»), risponde in testo e poi in
+voce (breve, senza markdown né link; massimo 500 caratteri parlati). Un vocale non conferma mai
+un'azione `confirm`: la richiesta compare sullo schermo coi pulsanti e non viene detta a voce. Un
+utente non autorizzato non fa scaricare nulla. Se la trascrizione è vuota chiede di ripetere. Se
+manca una chiave vocale, il testo funziona e i vocali sono ignorati (avviso nel log).
+
+Criteri della fase 6: 1 (un vocale riceve risposta corretta in testo e audio) da provare su
+Telegram; 2, 3 (tempo reale, interruzione) e il resto del 4 riguardano il passo 2, non fatto;
+4 (azioni `confirm` mai con la sola voce) coperto dai test per il passo 1; 5 (benchmark
+documentato e fornitori configurabili da `.env`) PASS.
+
+### Benchmark (2026-11-16)
 
 Fatto: benchmark in italiano (`uv run python -m evals.voice.bench`, rapporto in
 `docs/voce-benchmark.md`). Fornitori provati: trascrizione con Deepgram Nova-3, ElevenLabs Scribe
@@ -181,8 +213,8 @@ Cartesia Ink 5-6%; il primo audio della sintesi arriva in 86-330 ms su tutte le 
 servizi sbagliano "No, annulla" (sentito come "a nulla"). I fornitori NON sono ancora fissati:
 manca la prova con le registrazioni vere dell'utente e l'ascolto delle voci.
 
-Da fare: registrazioni vere (5-8 frasi) e ascolto delle voci per scegliere; poi il passo 1
-(messaggi vocali su Telegram) e il passo 2 (tempo reale con Pipecat). I fornitori vanno
-configurabili da `.env` (criterio 5).
+Da fare: il passo 2 (conversazione in tempo reale con Pipecat, da una pagina web sul telefono),
+che misura anche la latenza in streaming; instradamento per latenza (modello piccolo per le
+richieste semplici).
 
-Le fasi 7 NON è iniziata.
+La fase 7 NON è iniziata.

@@ -88,8 +88,17 @@ async def tts_elevenlabs(
 
 
 async def tts_cartesia(
-    client: httpx.AsyncClient, key: str, text: str, voice: str, model: str
+    client: httpx.AsyncClient,
+    key: str,
+    text: str,
+    voice: str,
+    model: str,
+    audio_format: str = "wav",  # "wav" (the benchmark) or "mp3" (Telegram voice messages)
 ) -> Synthesis:
+    if audio_format == "mp3":
+        output = {"container": "mp3", "sample_rate": 44100, "bit_rate": 128000}
+    else:  # raw PCM wrapped in a valid WAV here, instead of trusting a streamed WAV header
+        output = {"container": "raw", "encoding": "pcm_s16le", "sample_rate": PCM_RATE}
     data, first, total = await _post_stream(
         client,
         "https://api.cartesia.ai/tts/bytes",
@@ -99,9 +108,11 @@ async def tts_cartesia(
             "transcript": text,
             "voice": {"id": voice},
             "language": "it",
-            "output_format": {"container": "raw", "encoding": "pcm_s16le", "sample_rate": PCM_RATE},
+            "output_format": output,
         },
     )
+    if audio_format == "mp3":
+        return Synthesis(Audio(data, "audio/mpeg", "mp3"), first, total)
     return Synthesis(Audio(pcm_to_wav(data), "audio/wav", "wav"), first, total)
 
 
@@ -147,29 +158,3 @@ async def stt_cartesia(client: httpx.AsyncClient, key: str, audio: Audio) -> Tra
     )
     _check(r, "cartesia-stt")
     return Transcription(r.json()["text"], time.monotonic() - t0)
-
-
-# name -> (function, key setting, extra arguments)
-TTS_SERVICES: dict[str, tuple[Any, str, dict[str, str]]] = {
-    "elevenlabs-multilingual-v2 (Alice)": (
-        tts_elevenlabs, "elevenlabs_api_key",
-        {"voice": "Xb7hH8MSUJpSbSDYk0k2", "model": "eleven_multilingual_v2"},
-    ),
-    "elevenlabs-flash-v2.5 (Alice)": (
-        tts_elevenlabs, "elevenlabs_api_key",
-        {"voice": "Xb7hH8MSUJpSbSDYk0k2", "model": "eleven_flash_v2_5"},
-    ),
-    "cartesia-sonic-3.6 (Elena)": (
-        tts_cartesia, "cartesia_api_key",
-        {"voice": "00e9ec78-2002-41dd-8d19-6b1d3b17a461", "model": "sonic-3.6"},
-    ),
-    "cartesia-sonic-3.6 (Lorenzo)": (
-        tts_cartesia, "cartesia_api_key",
-        {"voice": "ee16f140-f6dc-490e-a1ed-c1d537ea0086", "model": "sonic-3.6"},
-    ),
-}  # fmt: skip
-STT_SERVICES: dict[str, tuple[Any, str]] = {
-    "deepgram-nova-3": (stt_deepgram, "deepgram_api_key"),
-    "elevenlabs-scribe": (stt_elevenlabs, "elevenlabs_api_key"),
-    "cartesia-ink-whisper": (stt_cartesia, "cartesia_api_key"),
-}

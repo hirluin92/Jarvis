@@ -4,9 +4,9 @@ import wave
 import httpx
 import pytest
 
-from evals.voice import providers
+from app.voice import providers
+from app.voice.providers import Audio, ProviderError, audio_seconds, pcm_to_wav
 from evals.voice.bench import load_phrases, pct, render_report, slug
-from evals.voice.providers import Audio, ProviderError, audio_seconds, pcm_to_wav
 from evals.voice.wer import italian_number, normalize, wer
 
 

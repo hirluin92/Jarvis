@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     tool_timeout_seconds: float = 30
     github_read_token: str = Field("", validation_alias="GH_READ_TOKEN")
     github_write_token: str = Field("", validation_alias="GH_WRITE_TOKEN")
+    # voice: providers are chosen here, not in code (see docs/voce-benchmark.md)
+    stt_provider: str = "elevenlabs"  # elevenlabs | deepgram | cartesia
+    tts_provider: str = "cartesia"  # cartesia | elevenlabs
+    tts_voice: str = "ee16f140-f6dc-490e-a1ed-c1d537ea0086"  # Cartesia "Lorenzo", Italian
+    tts_model: str = "sonic-3.6"
     deepgram_api_key: str = ""
     elevenlabs_api_key: str = ""
     cartesia_api_key: str = ""

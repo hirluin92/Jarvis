@@ -1,8 +1,10 @@
 import asyncio
+import logging
 import secrets
 from contextlib import asynccontextmanager
 from zoneinfo import ZoneInfo
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
@@ -18,7 +20,10 @@ from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
 from app.tracing import Tracer
+from app.voice.service import VoiceService
 from app.web import router as web_router
+
+log = logging.getLogger("jarvis.main")
 
 
 def _run_dict(run, with_steps: bool = False) -> dict:
@@ -75,6 +80,13 @@ async def lifespan(app: FastAPI):
             keep_recent=12,
         )
 
+    http = httpx.AsyncClient(timeout=60)  # shared by the speech providers
+    voice: VoiceService | None = None
+    try:
+        voice = VoiceService(s, http)
+    except ValueError as e:  # text keeps working; voice messages are simply not handled
+        log.warning("voice disabled: %s", e)
+
     app.state.tracer = tracer
     app.state.memory = memory
     app.state.csrf_token = secrets.token_urlsafe(32)  # guards the web page's edit/forget forms
@@ -86,6 +98,7 @@ async def lifespan(app: FastAPI):
             tracer,
             conversations=conversations,
             memory=memory,
+            voice=voice,
         ),
     )
     await bot.initialize()
@@ -110,6 +123,7 @@ async def lifespan(app: FastAPI):
     await bot.updater.stop()
     await bot.stop()
     await bot.shutdown()
+    await http.aclose()
     await db.engine().dispose()
 
 

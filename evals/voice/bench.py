@@ -22,14 +22,42 @@ import httpx
 import yaml
 
 from app.config import get_settings
-from evals.voice.providers import (
-    STT_SERVICES,
-    TTS_SERVICES,
+from app.voice.providers import (
     Audio,
     ProviderError,
     audio_seconds,
+    stt_cartesia,
+    stt_deepgram,
+    stt_elevenlabs,
+    tts_cartesia,
+    tts_elevenlabs,
 )
 from evals.voice.wer import wer
+
+# name -> (function, key setting, extra arguments)
+TTS_SERVICES: dict[str, tuple[Any, str, dict[str, str]]] = {
+    "elevenlabs-multilingual-v2 (Alice)": (
+        tts_elevenlabs, "elevenlabs_api_key",
+        {"voice": "Xb7hH8MSUJpSbSDYk0k2", "model": "eleven_multilingual_v2"},
+    ),
+    "elevenlabs-flash-v2.5 (Alice)": (
+        tts_elevenlabs, "elevenlabs_api_key",
+        {"voice": "Xb7hH8MSUJpSbSDYk0k2", "model": "eleven_flash_v2_5"},
+    ),
+    "cartesia-sonic-3.6 (Elena)": (
+        tts_cartesia, "cartesia_api_key",
+        {"voice": "00e9ec78-2002-41dd-8d19-6b1d3b17a461", "model": "sonic-3.6"},
+    ),
+    "cartesia-sonic-3.6 (Lorenzo)": (
+        tts_cartesia, "cartesia_api_key",
+        {"voice": "ee16f140-f6dc-490e-a1ed-c1d537ea0086", "model": "sonic-3.6"},
+    ),
+}  # fmt: skip
+STT_SERVICES: dict[str, tuple[Any, str]] = {
+    "deepgram-nova-3": (stt_deepgram, "deepgram_api_key"),
+    "elevenlabs-scribe": (stt_elevenlabs, "elevenlabs_api_key"),
+    "cartesia-ink-whisper": (stt_cartesia, "cartesia_api_key"),
+}
 
 HERE = Path(__file__).parent
 AUDIO_DIR = HERE / "audio"  # cached synthesis, git-ignored
@@ -230,7 +258,10 @@ async def main(args: argparse.Namespace) -> int:
         stt_rows = await transcribe_all(client, settings, phrases, sources)
     RESULTS_DIR.mkdir(exist_ok=True)
     raw = RESULTS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}.json"
-    raw.write_text(json.dumps({"tts": tts_rows, "stt": stt_rows}, indent=2, ensure_ascii=False))
+    raw.write_text(
+        json.dumps({"tts": tts_rows, "stt": stt_rows}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     REPORT.write_text(render_report(tts_rows, stt_rows, stamp), encoding="utf-8")
     print(f"Rapporto scritto in {REPORT}; risultati grezzi in {raw}")
     return 0

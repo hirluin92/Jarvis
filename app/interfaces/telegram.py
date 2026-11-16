@@ -21,12 +21,15 @@ from app.agent.loop import (
     resume_confirmed,
     run_agent,
 )
+from app.agent.prompts import VOICE_STYLE
 from app.conversations import ConversationStore
 from app.costs import estimate_cost, format_cost
 from app.feedback import mark_bad_and_draft
 from app.memory import MemoryStore, format_memory
 from app.report import generate_report
 from app.tracing import Tracer
+from app.voice.providers import Audio
+from app.voice.service import VoiceService, speakable
 
 log = logging.getLogger("jarvis.telegram")
 
@@ -41,6 +44,7 @@ class BotState:
     last_run: dict[int, int] = field(default_factory=dict)
     conversations: ConversationStore | None = None  # persistent history (Postgres)
     memory: MemoryStore | None = None  # saved facts; also feeds the context of each run
+    voice: VoiceService | None = None  # speech in/out; None = voice messages are ignored
 
     async def ctx(self, chat_id: int) -> AgentContext:
         if chat_id not in self.contexts:
@@ -85,6 +89,15 @@ async def _reply(update: Update, state: BotState, result: AgentResult) -> None:
         await update.effective_message.reply_text(result.answer, reply_markup=kb)
     else:
         await update.effective_message.reply_text(result.answer or "(nessuna risposta)")
+
+
+async def _speak(update: Update, voice: VoiceService, answer: str) -> None:
+    """Send the answer as a voice message. The text was already sent, so a failure is harmless."""
+    try:
+        said = await voice.speak(speakable(answer))
+        await update.effective_message.reply_voice(voice=said.audio.data)
+    except Exception:
+        log.exception("could not send the spoken answer")
 
 
 def build_handlers(state: BotState) -> list:
@@ -179,19 +192,47 @@ def build_handlers(state: BotState) -> list:
             typing.cancel()
         await _reply(update, state, result)
 
-    async def on_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        if not _allowed(state, update) or not update.effective_message.text:
-            return
+    async def answer(update: Update, text: str, spoken: bool) -> None:
+        """One path for typed and spoken requests: same agent, same confirmations."""
         cid = update.effective_chat.id
         ctx = await state.ctx(cid)
         if old := state.pending.pop(cid, None):
             cancel_pending(ctx, old)  # keep history valid: unanswered confirm = cancelled
+        ctx.style_extra = VOICE_STYLE if spoken else ""
         typing = asyncio.create_task(_typing(update))
         try:
-            result = await run_agent(update.effective_message.text, ctx)
+            result = await run_agent(text, ctx)
         finally:
             typing.cancel()
+            ctx.style_extra = ""
         await _reply(update, state, result)
+        # a pending confirmation is shown on screen with its buttons, never settled by voice
+        if spoken and state.voice is not None and not result.pending and result.answer:
+            await _speak(update, state.voice, result.answer)
+
+    async def on_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or not update.effective_message.text:
+            return
+        await answer(update, update.effective_message.text, spoken=False)
+
+    async def on_voice(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.voice is None:  # check before any download
+            return
+        msg = update.effective_message
+        try:
+            tg_file = await msg.voice.get_file()
+            data = bytes(await tg_file.download_as_bytearray())
+            heard = await state.voice.transcribe(Audio(data, "audio/ogg", "ogg"))
+        except Exception:
+            log.exception("could not transcribe a voice message")
+            await msg.reply_text("Non sono riuscito a trascrivere il vocale: riprova o scrivimi.")
+            return
+        text = heard.text.strip()
+        if not text:
+            await msg.reply_text("Non ho capito: puoi ripetere?")
+            return
+        await msg.reply_text(f"🎤 «{text}»")  # show what was understood, so errors are visible
+        await answer(update, text, spoken=True)
 
     async def on_button(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         q = update.callback_query
@@ -228,6 +269,7 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("memory", memory_list),
         CommandHandler("forget", forget_cmd),
         CallbackQueryHandler(on_button),
+        MessageHandler(filters.VOICE, on_voice),
         MessageHandler(filters.TEXT & ~filters.COMMAND, on_text),
     ]
 

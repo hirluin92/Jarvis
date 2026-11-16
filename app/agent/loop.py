@@ -60,6 +60,7 @@ class AgentContext:
     summary: str = ""  # folded-in older part of the conversation
     summary_threshold: int | None = None  # summarise when history grows beyond this many messages
     keep_recent: int = 12  # messages kept verbatim after a summary
+    style_extra: str = ""  # extra answer-style instruction for the current run (e.g. spoken)
 
 
 def _trim(history: list[dict[str, Any]], limit: int) -> None:
@@ -191,6 +192,8 @@ SUMMARY_SYSTEM = (
 async def _system_for(ctx: AgentContext, user_message: str) -> str:
     """The system prompt plus what this run should know: older-conversation summary, saved facts."""
     parts = [SYSTEM_PROMPT]
+    if ctx.style_extra:
+        parts.append(ctx.style_extra)
     if ctx.summary:
         parts.append(f"Summary of the earlier conversation (data):\n{ctx.summary}")
     if ctx.system_extra is not None:

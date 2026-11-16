@@ -1,6 +1,6 @@
 # Benchmark vocale in italiano
 
-Generato da `evals/voice/bench.py` il 2026-11-16 11:11. Venti frasi in italiano (`evals/voice/phrases.yaml`). Errore di parola (WER) calcolato dopo normalizzazione: maiuscole, accenti, punteggiatura e cifre scritte in lettere non contano come errori.
+Generato da `evals/voice/bench.py` il 2026-11-16 11:38. Venti frasi in italiano (`evals/voice/phrases.yaml`). Errore di parola (WER) calcolato dopo normalizzazione: maiuscole, accenti, punteggiatura e cifre scritte in lettere non contano come errori.
 
 ## Sintesi vocale (testo → voce)
 
@@ -17,20 +17,20 @@ Il primo audio è quello che conta in una conversazione: è l'attesa prima che l
 
 WER medio (più basso è meglio), per servizio e per origine dell'audio:
 
-| Servizio | elevenlabs-multilingual-v2 (Alice) | elevenlabs-flash-v2.5 (Alice) | cartesia-sonic-3.6 (Elena) | cartesia-sonic-3.6 (Lorenzo) | Latenza media | Latenza p95 |
-|---|---|---|---|---|---|---|
-| deepgram-nova-3 | 8.0% (n=20) | 8.0% (n=20) | 1.2% (n=20) | 1.2% (n=20) | 0.37 s | 0.92 s |
-| elevenlabs-scribe | 0.0% (n=20) | 0.4% (n=20) | 0.4% (n=20) | 0.0% (n=20) | 0.58 s | 0.84 s |
-| cartesia-ink-whisper | 6.4% (n=20) | 6.4% (n=20) | 5.4% (n=20) | 6.2% (n=20) | 0.27 s | 0.39 s |
+| Servizio | elevenlabs-multilingual-v2 (Alice) | elevenlabs-flash-v2.5 (Alice) | cartesia-sonic-3.6 (Elena) | cartesia-sonic-3.6 (Lorenzo) | registrazioni reali | Latenza media | Latenza p95 |
+|---|---|---|---|---|---|---|---|
+| deepgram-nova-3 | 8.0% (n=20) | 8.0% (n=20) | 1.2% (n=20) | 1.2% (n=20) | 17.6% (n=8) | 0.19 s | 0.25 s |
+| elevenlabs-scribe | 0.0% (n=20) | 1.0% (n=20) | 0.0% (n=20) | 0.0% (n=20) | 3.4% (n=8) | 0.60 s | 0.81 s |
+| cartesia-ink-whisper | 6.4% (n=20) | 6.4% (n=20) | 5.4% (n=20) | 6.2% (n=20) | 16.0% (n=8) | 0.22 s | 0.31 s |
 
 Gli errori più gravi:
 
 - **deepgram-nova-3** (elevenlabs-multilingual-v2 (Alice)), frase 12, WER 100%: «No, annulla.» → «A nulla.»
 - **deepgram-nova-3** (elevenlabs-flash-v2.5 (Alice)), frase 12, WER 100%: «No, annulla.» → «No, a nulla.»
+- **deepgram-nova-3** (registrazioni reali), frase 12, WER 100%: «No, annulla.» → «No, a nulla.»
 - **cartesia-ink-whisper** (elevenlabs-multilingual-v2 (Alice)), frase 12, WER 100%: «No, annulla.» → «No a nulla.»
 - **cartesia-ink-whisper** (elevenlabs-flash-v2.5 (Alice)), frase 12, WER 100%: «No, annulla.» → «No a nulla.»
 - **cartesia-ink-whisper** (cartesia-sonic-3.6 (Elena)), frase 12, WER 100%: «No, annulla.» → «No, a nulla.»
-- **cartesia-ink-whisper** (cartesia-sonic-3.6 (Lorenzo)), frase 12, WER 100%: «No, annulla.» → «No, a nulla.»
 
 ## Limiti di questo confronto
 
