@@ -107,8 +107,34 @@ async def test_forgotten_facts_are_not_retrieved(store):  # criterion 3
     m = await store.remember("Il mio dentista è il dottor Bianchi", "person")
     assert await store.forget(m.id) is True
     assert await store.search("dentista") == []
-    assert await store.context_for("chi è il mio dentista?") == ""
     assert await store.forget(m.id) is False  # already forgotten
+    block = await store.context_for("chi è il mio dentista?")
+    assert "Saved facts" not in block  # not offered as a fact any more...
+    assert (
+        "asked you to forget" in block and "dottor Bianchi" in block
+    )  # ...and flagged as off limits
+
+
+async def test_forgetting_also_stops_the_model_repeating_it_from_the_chat_history(
+    tracer, make_ctx, store
+):
+    m = await store.remember("Il mio dentista è il dottor Bianchi", "person")
+    await store.forget(m.id)
+    llm = FakeLLMClient([LLMResponse(text="Non lo so.")])
+    ctx = make_ctx(llm, system_extra=store.context_for)
+    ctx.history = [
+        {"role": "user", "content": "chi è il mio dentista?"},
+        {"role": "assistant", "content": "Il dottor Bianchi."},  # said before it was forgotten
+    ]
+    await run_agent("e adesso, chi è?", ctx)
+    assert "never use or repeat them" in llm.systems[0].lower()
+    assert "dottor Bianchi" in llm.systems[0] and "forget" in llm.systems[0]
+
+
+async def test_no_notice_when_nothing_was_forgotten(store):
+    await store.remember("Il mio dentista è il dottor Bianchi", "person")
+    assert "forget" not in await store.context_for("chi è il mio dentista?")
+    assert await store.context_for("che ore sono") == ""
 
 
 async def test_context_block_is_capped_and_labelled_as_data(store, monkeypatch):

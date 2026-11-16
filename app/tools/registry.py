@@ -32,6 +32,9 @@ class ToolRegistry:
             raise ValueError(f"tool already registered: {tool.name}")
         self._tools[tool.name] = tool
 
+    def names_with(self, permission: Permission) -> frozenset[str]:
+        return frozenset(t.name for t in self._tools.values() if t.permission == permission)
+
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 

@@ -75,26 +75,44 @@ class AnthropicClient:
 
 
 class RoutedLLM:
-    """Latency routing: a small fast model answers first; the main model takes over when a tool
-    is needed or after tool results (reasoning). Simple questions never wait for the big model.
+    """Latency routing between a small fast model and the main one.
 
-    `model` is the main model's, which is what the run is billed against in the trace; the
-    fast attempt that escalates is discarded and its (small) tokens are not counted. Each
-    response says which model wrote it (`LLMResponse.model`).
+    The fast model handles the plain cases: answering directly, calling a read-only tool, and
+    writing the answer from read-only results. The main model takes over whenever something
+    could change the world (a write or confirm tool) or after such a tool ran, so decisions with
+    consequences are never made by the small model.
+
+    `model` is the main model's, which is what the run is billed against in the trace; a fast
+    attempt that escalates is discarded and its (small) tokens are not counted. Each response
+    says which model wrote it (`LLMResponse.model`).
     """
 
-    def __init__(self, fast: LLMClient, main: LLMClient) -> None:
+    def __init__(
+        self, fast: LLMClient, main: LLMClient, safe_tools: frozenset[str] = frozenset()
+    ) -> None:
         self.fast, self.main = fast, main
+        self.safe_tools = safe_tools  # names of read-only tools the fast model may call
         self.model = main.model
+
+    def _fast_may_handle(self, messages: list[dict[str, Any]]) -> bool:
+        last = messages[-1] if messages else None
+        if last is None or last["role"] != "user":
+            return False
+        if isinstance(last["content"], str):  # a fresh request from the user
+            return True
+        # results of tools: the fast model writes the answer only if every tool was read-only
+        previous = messages[-2]["content"] if len(messages) > 1 else []
+        called = {
+            b["name"] for b in previous if isinstance(b, dict) and b.get("type") == "tool_use"
+        }
+        return bool(called) and called <= self.safe_tools
 
     async def complete(self, system, messages, tools, on_text: TextSink | None = None):
         kw: dict[str, Any] = {"on_text": on_text} if on_text else {}
-        first_step = bool(messages) and messages[-1]["role"] == "user"
-        first_step = first_step and isinstance(messages[-1]["content"], str)
-        if first_step:
+        if self._fast_may_handle(messages):
             quick = await self.fast.complete(system, messages, tools, **kw)
-            if not quick.tool_uses:
-                return quick
+            if all(t.name in self.safe_tools for t in quick.tool_uses):
+                return quick  # no tool, or only read-only ones: no need to wait for the big model
         return await self.main.complete(system, messages, tools, **kw)
 
 

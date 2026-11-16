@@ -22,7 +22,9 @@ async def recall(inp: RecallInput) -> dict[str, object]:
 
 TOOL = Tool(
     "recall",
-    "Search the saved facts about the user by words in the query, optionally by category.",
+    "Search the saved facts about the user by words in the query, optionally by category. One "
+    "search is enough: if nothing matches, say you have no saved fact about it instead of "
+    "retrying with variations.",
     RecallInput,
     "read",
     recall,

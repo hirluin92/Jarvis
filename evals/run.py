@@ -47,7 +47,8 @@ async def run_scenario(
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
     if sc.routed:  # exactly what a spoken turn does: fast model first, spoken answer style
         fast = AnthropicClient(s.anthropic_api_key, s.fast_model, "low")
-        result = await run_agent(question, ctx, style=VOICE_STYLE, llm=RoutedLLM(fast, llm))
+        router = RoutedLLM(fast, llm, ctx.registry.names_with("read"))
+        result = await run_agent(question, ctx, style=VOICE_STYLE, llm=router)
     else:
         result = await run_agent(question, ctx)
     run = await tracer.get_run(result.run_id)

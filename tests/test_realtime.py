@@ -281,6 +281,54 @@ async def test_after_tool_results_only_the_main_model_reasons():
     assert fast.calls == []
 
 
+async def test_a_read_only_tool_call_is_left_to_the_fast_model():
+    tool = LLMResponse(tool_uses=[ToolUse("1", "get_current_time", {})])
+    fast, main = FakeLLMClient([tool]), FakeLLMClient([])
+    router = RoutedLLM(fast, main, frozenset({"get_current_time"}))
+    out = await router.complete("s", [{"role": "user", "content": "che ore sono?"}], [])
+    assert out.tool_uses[0].name == "get_current_time" and main.calls == []  # no second call
+
+
+async def test_a_tool_that_can_change_something_is_decided_by_the_main_model():
+    tool = LLMResponse(tool_uses=[ToolUse("1", "create_note", {"text": "x"})])
+    fast, main = FakeLLMClient([tool]), FakeLLMClient([LLMResponse(text="deciso dal principale")])
+    router = RoutedLLM(fast, main, frozenset({"get_current_time"}))  # create_note: not read-only
+    out = await router.complete("s", [{"role": "user", "content": "annota x"}], [])
+    assert out.text == "deciso dal principale" and len(fast.calls) == 1 and len(main.calls) == 1
+
+
+def _after_tool(name):
+    call = {"type": "tool_use", "id": "1", "name": name, "input": {}}
+    result = {"type": "tool_result", "tool_use_id": "1", "content": "ok"}
+    return [
+        {"role": "user", "content": "domanda"},
+        {"role": "assistant", "content": [call]},
+        {"role": "user", "content": [result]},
+    ]
+
+
+async def test_the_fast_model_writes_the_answer_after_read_only_results():
+    fast, main = FakeLLMClient([LLMResponse(text="sono le otto")]), FakeLLMClient([])
+    router = RoutedLLM(fast, main, frozenset({"get_current_time"}))
+    out = await router.complete("s", _after_tool("get_current_time"), [])
+    assert out.text == "sono le otto" and main.calls == []
+
+
+async def test_after_a_write_tool_only_the_main_model_reasons():
+    fast, main = FakeLLMClient([]), FakeLLMClient([LLMResponse(text="sintesi")])
+    router = RoutedLLM(fast, main, frozenset({"get_current_time"}))
+    assert (await router.complete("s", _after_tool("create_note"), [])).text == "sintesi"
+    assert fast.calls == []
+
+
+def test_the_registry_lists_its_read_only_tools():
+    from app.tools.builtin import default_registry
+
+    reads = default_registry().names_with("read")
+    assert "get_current_time" in reads and "recall" in reads
+    assert not reads & {"send_email", "create_note", "forget", "merge_pull_request"}
+
+
 # ---- confirmations shown on Telegram ----
 
 

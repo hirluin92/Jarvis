@@ -111,7 +111,8 @@ async def lifespan(app: FastAPI):
             log.warning("real-time voice disabled: needs working voice keys and an allowed user")
         else:
             chat_id = s.telegram_allowed_user_ids[0]  # the voice page shares this Telegram chat
-            routed = RoutedLLM(AnthropicClient(s.anthropic_api_key, s.fast_model, "low"), llm)
+            fast = AnthropicClient(s.anthropic_api_key, s.fast_model, "low")
+            routed = RoutedLLM(fast, llm, registry.names_with("read"))
 
             async def confirm_on_telegram(result) -> None:
                 await send_confirmation(bot.bot, bot_state, chat_id, result)

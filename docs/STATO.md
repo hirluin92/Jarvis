@@ -246,6 +246,18 @@ ha dato un'ora sbagliata di 16 minuti senza chiamare `get_current_time`. Correzi
   mentre il resto è ancora in scrittura. La latenza ora registra anche `agent_s` (fino alle
   prime parole) e `reply_done_s` (risposta intera).
 - Il passo di trace `llm_call` dice quale modello ha scritto la risposta (`model`).
-Da misurare di nuovo dal vivo dopo queste correzioni (criteri 2 e 3).
+Seconda prova dal vivo (8 turni): trascrizione 0,2 s e voce 0,06 s, ma le domande con tool
+andavano da 3,2 a 6,3 s e una ricerca in memoria ha chiamato `recall` quattro volte (9,2 s). Cause
+e correzioni:
+- Il router scartava e ripeteva col modello principale anche i tool di sola lettura. Ora il
+  modello veloce gestisce risposta diretta, tool in sola lettura e la risposta dopo i risultati di
+  tool in sola lettura; il principale decide scritture e conferme (`RoutedLLM(safe_tools=...)`).
+  Nelle eval le domande sull'ora passano da 3,0-3,3 s a 1,6 s (non in streaming).
+- La descrizione di `recall` dice di cercare una volta sola.
+- I fatti dimenticati con `/forget` non erano più nella memoria ma restavano nella cronologia
+  della chat: Jarvis li ripeteva ("il dato salvato è sempre il dottor Bianchi"). Ora ogni richiesta
+  porta un avviso con i fatti dimenticati di recente (massimo 10): "non usarli nemmeno se
+  compaiono prima nella conversazione".
+Da misurare di nuovo dal vivo (criteri 2 e 3), in particolare una domanda senza tool.
 
 La fase 7 NON è iniziata.
