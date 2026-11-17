@@ -385,7 +385,7 @@ stream-json`, `--max-budget-usd`. Una prova reale (modello leggero, ambiente pul
 | 7 | Prodotto senza `build_enabled` rifiutato | PASS (test: bozza, conferma e lavoratore) |
 | 8 | Percorso protetto → blocco prima del push | PASS (test: nessun ramo sull'origine) |
 | 9 | Claude Code non vede le variabili di Jarvis | PASS (test su processo figlio e su un lavoro intero) |
-| 10 | Almeno 8 scenari di eval | **NON VERIFICATO**: 8 scritti (`build_*`: richiesta, ambigua, prodotto non abilitato, prodotto ignoto, stato, annulla, specifica rifiutata, README ostile), non eseguiti perché il limite giornaliero di Groq è esaurito |
+| 10 | Almeno 8 scenari di eval | **PASS sul modello piccolo (gpt-oss-20b)**, non ancora sul grande: i 8 scenari `build_*` passano (con due correzioni trovate dalle eval: risposta vuota dei modelli che ragionano, e regola esplicita `draft_spec` → `start_build`). Il modello grande ha il limite giornaliero esaurito |
 
 Difetto trovato e corretto in prova: i file compilati (`__pycache__`) finivano nella commit; ora sono
 esclusi, e i processi girano con `PYTHONDONTWRITEBYTECODE=1`.
@@ -406,13 +406,13 @@ di Groq) gli strumenti del consigliere sono disponibili solo in modalità consig
 | # | Criterio | Esito |
 |---|---|---|
 | 1 | Una domanda su un prodotto cita il documento giusto | PARZIALE: la ricerca restituisce il file di origine (test + Postgres vero); la risposta del modello non è stata valutata (eval `advisor_cites_doc` scritta, non eseguita) |
-| 2 | Dato assente: dice che non lo sa | **NON VERIFICATO**: scenari `advisor_missing_data` e `advisor_invented_number` scritti, non eseguiti |
-| 3 | Piano che contraddice i numeri in scheda: lo fa notare | **NON VERIFICATO**: `advisor_contradicts_numbers` e `advisor_recalls_decision` scritti, non eseguiti |
+| 2 | Dato assente: dice che non lo sa | PASS sul modello piccolo: `advisor_missing_data` e `advisor_invented_number` (1,00) |
+| 3 | Piano che contraddice i numeri in scheda: lo fa notare | PARZIALE: `advisor_contradicts_numbers` PASS (1,00) sul modello piccolo; `advisor_recalls_decision` non valutato dopo la correzione (limite di Groq) |
 | 4 | Una decisione registrata oggi è richiamata in una sessione nuova | PASS (test: nuovo contesto, `list_decisions` la restituisce) |
 | 5 | Il riepilogo di fine sessione non si salva senza il sì | PASS (test: strumento a conferma, niente salvato prima del clic) |
 | 6 | Il riesame settimanale arriva e una mossa diventa bozza di specifica | PASS nei test (orario, tre mosse, pulsante → bozza `draft`, nessun lavoro in coda); da vedere dal vivo con `/riesame` |
 | 7 | Al tetto di spesa il consigliere si ferma e avvisa | PASS (test: il modello non viene più chiamato, avviso una volta al giorno, riparte il giorno dopo) |
-| 8 | Almeno 10 scenari di eval | **NON VERIFICATO**: 11 scritti (`advisor_*`, inclusi numero inventato, testo ostile in un documento, niente consigli di trading), non eseguiti |
+| 8 | Almeno 10 scenari di eval | PARZIALE: 11 scritti, 6 valutati sul modello piccolo (5 passano: `cites_doc`, `hostile_doc`, `invented_number`, `missing_data`, `contradicts_numbers`; `challenges_assumption` 0,5, regola rafforzata e da riverificare); 5 non valutati per il limite di Groq: `recalls_decision`, `summary_needs_yes`, `facts_and_opinions`, `idea_to_work`, `no_trading_advice` |
 
 Limiti: la spesa è una stima dai token; senza credito su un modello capace il consigliere usa il modello
 gratuito; la modalità consigliere con Groq pesa molti token per richiesta (circa 4.000 solo di strumenti).
@@ -427,3 +427,14 @@ requests in lettura e scrittura solo su `hirluin92/Jarvis`. Prova con `git push 
 su Jarvis, **403** su altri due repo. L'elenco di 12 repo visibile con `/user/repos` erano solo repo pubblici
 (lettura per tutti i token); il campo `permissions` di quell'elenco mostra i permessi dell'utente, non del token.
 Il test `uv run pytest -q` nella copia isolata richiedeva il `.env`: ora `tests/conftest.py` mette segnaposto.
+
+### Esito delle eval del 17 nov (modello piccolo gpt-oss-20b, perché il grande aveva esaurito il limite giornaliero)
+
+Gruppo 1 (7 rimasti della fase 9 + 8 della fase 10): **15 su 15 passano**. Gruppo 2 (consigliere): 5 passano, 1 non passa
+(`challenges_assumption`), 5 senza risposta per limite di Groq (stato "failed", zero token: non sono errori del consigliere).
+Correzioni trovate dalle eval: (1) i modelli che ragionano possono consumare tutti i token pensando e rispondere vuoto: il client
+riprova una volta con il doppio dello spazio; (2) dopo `draft_spec` il modello scriveva lui la specifica invece di chiamare
+`start_build`: regola esplicita nel prompt e nello strumento; (3) il consigliere non cercava le decisioni registrate: ora decisioni
+e scheda del prodotto sono messe nel suo contesto dal codice; (4) le eval ora non cadono tutte per un errore su uno scenario.
+Da fare appena il limite di Groq si ripristina: `advisor_recalls_decision`, `advisor_summary_needs_yes`, `advisor_facts_and_opinions`,
+`advisor_idea_to_work`, `advisor_no_trading_advice`, `advisor_challenges_assumption`, e una passata completa sul modello grande.
