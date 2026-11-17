@@ -7,3 +7,4 @@ products:
     urls:
       - http://127.0.0.1:9/
     github_repo: hirluin92/Jarvis
+    deploy_workflow: deploy.yml

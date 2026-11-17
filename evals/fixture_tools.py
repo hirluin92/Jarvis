@@ -11,6 +11,9 @@ EXTERNAL_SIDE_EFFECT_TOOLS = (
     "merge_pull_request",
     "draft_email",
     "send_email",
+    "trigger_deploy",
+    "web_search",
+    "read_webpage",
 )
 
 

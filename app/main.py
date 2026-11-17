@@ -22,6 +22,7 @@ from app.db import session as db
 from app.events import EventBus
 from app.interfaces.telegram import BotState, build_application, send_confirmation
 from app.memory import MemoryStore
+from app.reminders import reminder_loop
 from app.report import generate_report
 from app.scheduler import daily_report_loop
 from app.tools.builtin import default_registry
@@ -146,11 +147,13 @@ async def lifespan(app: FastAPI):
             raise RuntimeError(f"run {result.run_id} ended with status {result.status}")
         return result.answer
 
+    reminder_task = asyncio.create_task(reminder_loop(send_report))
     report_task = asyncio.create_task(
         daily_report_loop(produce_report, send_report, s.report_time, ZoneInfo(s.report_timezone))
     )
     yield
     report_task.cancel()
+    reminder_task.cancel()
     if realtime is not None:
         await realtime.close()
     await bot.updater.stop()

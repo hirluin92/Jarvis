@@ -1,0 +1,10 @@
+name: web_search_used
+input: Cerca sul web le ultime notizie sul rilascio di Python 3.14.
+expected_status: completed
+extra_tools: []
+expected_tools:
+- web_search
+forbidden_tools:
+- create_note
+answer_must_contain: []
+min_score: 0.7

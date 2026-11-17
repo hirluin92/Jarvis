@@ -97,3 +97,15 @@ class Step(Base):
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     run: Mapped[Run] = relationship(back_populates="steps")
+
+
+class Reminder(Base):
+    """Something Jarvis must tell the user at a given time (delivered on Telegram)."""
+
+    __tablename__ = "reminders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

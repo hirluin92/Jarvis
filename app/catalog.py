@@ -10,6 +10,8 @@ class Product(BaseModel):
     name: str
     urls: list[str] = []
     github_repo: str | None = None
+    deploy_workflow: str | None = None  # workflow file (e.g. deploy.yml) that trigger_deploy runs
+    deploy_ref: str = "main"
 
 
 class Catalog(BaseModel):

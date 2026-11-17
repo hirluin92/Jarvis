@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
     groq_fast_model: str = "openai/gpt-oss-20b"
+    tavily_api_key: str = ""  # web search (free plan at tavily.com)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"
     gemini_fast_model: str = "gemini-3.5-flash-lite"
