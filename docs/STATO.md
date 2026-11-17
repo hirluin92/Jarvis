@@ -378,7 +378,7 @@ stream-json`, `--max-budget-usd`. Una prova reale (modello leggero, ambiente pul
 |---|---|---|
 | 1 | Richiesta vocale → specifica leggibile su Telegram | PARZIALE: il messaggio di conferma di `start_build` contiene la specifica intera (test); percorso vocale e Telegram non provati dal vivo |
 | 2 | Senza conferma non parte nessun lavoro | PASS (test: nessuna riga in `build_jobs` prima del clic) |
-| 3 | Lavoro reale su repo di prova → PR in bozza con test verdi | PARZIALE: lavoro vero con Claude Code su un repo locale con `origin` locale: ramo `jarvis/1-...` pubblicato, test verdi, riepilogo, copia pulita. La PR è stata **simulata** (la chiamata GitHub impone `draft: true`); serve un repo di prova su GitHub e `BUILD_GITHUB_TOKEN` |
+| 3 | Lavoro reale su repo di prova → PR in bozza con test verdi | **PASS (17 nov)**: lavoro #1 su `hirluin92/Jarvis` (prodotto di prova, solo `README.md`), 106 s, 5 passaggi, 301 test verdi nella copia isolata; ramo `jarvis/1-sezione-capocantiere-nel-readme`, **PR #3 in bozza** verso `main` (verificata da GitHub: `draft: true`, 1 commit, 1 file, autore "Jarvis build", `mergeable_state: blocked` dalla protezione del ramo); `main` indietro di 0 commit; avviso su Telegram inviato; copia di lavoro rimossa |
 | 4 | Il ramo principale non riceve mai commit | PASS (test e prova reale: `main` identico prima e dopo; si spinge solo `jarvis/...`) |
 | 5 | Tempo massimo superato → fermato e segnalato | PASS (test, anche per troppi passaggi) |
 | 6 | `cancel_build` ferma il lavoro e pulisce la copia | PASS (test con processo vero) |
@@ -421,3 +421,9 @@ Servono da te: credito sul fornitore del modello e i documenti in `knowledge/`.
 Eval in tutto: 72 scenari (53 + 8 + 11). **Da rilanciare a gruppi** quando il limite giornaliero di Groq si
 ripristina (`uv run python -m evals.run --only ...`), prima i 19 nuovi e i 7 rimasti fuori dalla fase 9.
 Test: 301.
+
+Nota sul token del capocantiere (17 nov): `BUILD_GITHUB_TOKEN` è un token a grana fine con Contents e Pull
+requests in lettura e scrittura solo su `hirluin92/Jarvis`. Prova con `git push --dry-run`: scrittura consentita
+su Jarvis, **403** su altri due repo. L'elenco di 12 repo visibile con `/user/repos` erano solo repo pubblici
+(lettura per tutti i token); il campo `permissions` di quell'elenco mostra i permessi dell'utente, non del token.
+Il test `uv run pytest -q` nella copia isolata richiedeva il `.env`: ora `tests/conftest.py` mette segnaposto.
