@@ -348,3 +348,18 @@ riflesso orizzontale sul nucleo quando qualcuno parla, luminosità ridotta per n
   `deploy_ref`) per quel prodotto; la conferma mostra repo, workflow e ramo; senza workflow nel
   catalogo si rifiuta. Mai eseguito su un sistema reale (nessun prodotto con deploy).
 - 21 test nuovi (259 in tutto) e 5 scenari di eval (53 in tutto).
+
+### Esito delle eval della fase 9 e limiti di Groq (17 nov)
+
+Ultima esecuzione completa su Groq (53 scenari): 45 passano, 8 no. Sette sono finiti "failed" con zero
+token perché Groq ha rifiutato le richieste: limite giornaliero di **200.000 token** del modello
+grande (risposta di Groq: "Limit 200000, Used 198656"), consumato dalle tre esecuzioni complete del
+giorno (ogni richiesta con 20 strumenti pesa circa 3.000 token). Limiti del piano gratuito: 1.000
+richieste e 200.000 token al giorno, 8.000 token al minuto, e il minuto conta anche i token
+"prenotati" con `max_tokens` (ridotto da 2048 a 1200). `capabilities` è ripassato (1,00) dopo che il
+giudice ha ricevuto l'elenco degli strumenti. Da rilanciare quando il limite si ripristina, a gruppi con
+`--only`: `time_today`, `tokyo_time`, `unsupported_action`, `voice_mail_needs_confirmation`,
+`web_search_used` (mai valutato con successo), `write_issue`, `write_todo`. Non lanciare mai due serie
+di eval insieme: si contendono lo stesso limite.
+
+Report completo del lavoro: `docs/REPORT-LAVORO.docx`.
