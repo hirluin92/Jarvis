@@ -19,7 +19,8 @@ async def http_health_check(inp: HealthInput) -> dict[str, object]:
 
 TOOL = Tool(
     "http_health_check",
-    "GET a URL and return HTTP status and response time in ms.",
+    "GET one arbitrary URL that the user typed or pasted and return HTTP status and response "
+    "time in ms. Not for products of the catalog: use site_status for those.",
     HealthInput,
     "read",
     http_health_check,

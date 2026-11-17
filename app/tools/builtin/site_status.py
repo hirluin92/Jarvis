@@ -67,8 +67,9 @@ async def site_status(inp: SiteStatusInput) -> dict[str, object]:
 
 TOOL = Tool(
     "site_status",
-    "Reachability, response time and TLS certificate expiry of the public URLs of a product "
-    "from the catalog. Omit 'product' to check all products.",
+    "Check whether a product from the catalog is up: reachability, response time and TLS "
+    "certificate expiry of its public URLs. Use this for any named product or site of the user "
+    "(for example 'Jarvis' or 'Demo Down'); omit 'product' to check all of them.",
     SiteStatusInput,
     "read",
     site_status,

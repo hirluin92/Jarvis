@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import sys
 import tempfile
 import time
@@ -51,23 +52,38 @@ async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: st
         result = await run_agent(question, ctx)
     run = await tracer.get_run(result.run_id)
     called = [x.tool_name for x in run.steps if x.type == "tool_call"]
-    ok = result.status == sc.expected_status
-    ok &= all(t in called for t in sc.expected_tools)
-    ok &= not any(t in called for t in sc.forbidden_tools)
-    for needle in sc.answer_must_contain:
-        ok &= needle.lower() in result.answer.lower()
+    why: list[str] = []  # what went wrong, shown under the table
+    if result.status != sc.expected_status:
+        why.append(f"status {result.status}, expected {sc.expected_status}")
+    why += [f"tool not called: {t}" for t in sc.expected_tools if t not in called]
+    why += [f"forbidden tool called: {t}" for t in sc.forbidden_tools if t in called]
+    why += [
+        f"answer lacks {n!r}"
+        for n in sc.answer_must_contain
+        if n.lower() not in result.answer.lower()
+    ]
+    ok = not why
     tin, tout = run.input_tokens, run.output_tokens
     score = None
     if sc.rubric:
-        v = await judge_answer(llm, tracer, sc.name, sc.input, result.answer, sc.rubric)
+        evidence = "\n".join(
+            json.dumps(x.output, ensure_ascii=False, default=str)[:1500]
+            for x in run.steps
+            if x.type == "tool_call"
+        )
+        v = await judge_answer(llm, tracer, sc.name, sc.input, result.answer, sc.rubric, evidence)
         score = v.score
-        ok &= score >= sc.min_score
+        if score < sc.min_score:
+            ok = False
+            why.append(f"judge {score:.2f} < {sc.min_score}: {v.reason[:140]}")
         tin, tout = tin + v.input_tokens, tout + v.output_tokens
     return {
         "name": sc.name,
         "ok": bool(ok),
         "score": score,
         "tools": called,
+        "why": why,
+        "answer": result.answer[:300],
         "secs": time.monotonic() - t0,
         "tokens": tin + tout,
         "cost": estimate_cost(llm.model, tin, tout) or 0.0,
@@ -88,10 +104,13 @@ def print_table(rows: list[dict]) -> None:
             f"{r['name']:<26}{result:<8}{score:>6}{r['secs']:>7.1f}{r['tokens']:>8}"
             f"{r['cost']:>9.4f}  {','.join(r['tools']) or '-'}"
         )
+    for r in rows:
+        for w in r.get("why", []):
+            print(f"  ! {r['name']}: {w}")
     print(f"total cost: ${sum(r['cost'] for r in rows):.4f}")
 
 
-async def main(max_cost: float | None) -> int:
+async def main(max_cost: float | None, only: set[str] | None = None) -> int:
     s = get_settings()
     default_catalog = s.products_file
     db_file = Path(tempfile.mkdtemp()) / "evals.db"  # isolated: evals never touch the real DB
@@ -103,6 +122,8 @@ async def main(max_cost: float | None) -> int:
     tracer = Tracer(session_maker())
     llm, _ = build_llms(s)
     scenarios = [load_scenario(p) for p in sorted(SCENARIOS_DIR.glob("*.yaml"))]
+    if only:
+        scenarios = [sc for sc in scenarios if sc.name in only]
     rows: list[dict] = []
     spent = 0.0
     for sc in scenarios:
@@ -126,5 +147,8 @@ async def main(max_cost: float | None) -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--only", default=None, help="comma separated scenario names")
     parser.add_argument("--max-cost", type=float, default=None, help="USD cap for this run")
-    sys.exit(asyncio.run(main(parser.parse_args().max_cost)))
+    args = parser.parse_args()
+    only = set(args.only.split(",")) if args.only else None
+    sys.exit(asyncio.run(main(args.max_cost, only)))
