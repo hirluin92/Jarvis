@@ -226,6 +226,14 @@ async def test_a_real_job_pushes_its_own_branch_and_opens_a_draft_pr(tracer, rep
     assert not (Path(repo.settings.build_workdir) / f"job-{job.id}").exists()  # copy cleaned up
 
 
+async def test_build_leftovers_are_never_committed(tracer, repo, monkeypatch):
+    catalog(monkeypatch, repo)
+    job = await run_job(repo, "junk")
+    files = git(repo.origin, "ls-tree", "-r", "--name-only", job.branch).split()
+    assert "feature.txt" in files
+    assert not [f for f in files if "__pycache__" in f or f.endswith(".pyc") or "node_modules" in f]
+
+
 async def test_a_change_to_a_protected_path_stops_the_job_before_any_push(
     tracer, repo, monkeypatch
 ):

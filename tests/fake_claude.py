@@ -35,6 +35,13 @@ elif mode == "protected":
     Path("secret/key.txt").write_text("x\n", encoding="utf-8")
     Path("feature.txt").write_text("y\n", encoding="utf-8")
     result()
+elif mode == "junk":
+    Path("feature.txt").write_text("z\n", encoding="utf-8")
+    Path("__pycache__").mkdir(exist_ok=True)
+    Path("__pycache__/x.cpython-312.pyc").write_bytes(b"\x00")
+    Path("node_modules/pkg").mkdir(parents=True, exist_ok=True)
+    Path("node_modules/pkg/index.js").write_text("x", encoding="utf-8")
+    result()
 elif mode == "noop":
     result("Non c'era niente da fare.")
 elif mode == "sleep":

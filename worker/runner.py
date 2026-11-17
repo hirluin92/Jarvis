@@ -99,7 +99,7 @@ async def run_tests(product: Product, worktree: Path) -> tuple[bool | None, str]
     proc = await asyncio.create_subprocess_shell(
         product.test_command,
         cwd=str(worktree),
-        env=clean_env(),
+        env=clean_env({"PYTHONDONTWRITEBYTECODE": "1"}),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )

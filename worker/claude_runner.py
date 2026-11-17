@@ -107,7 +107,7 @@ async def run_claude(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=str(cwd),
-        env=clean_env(),
+        env=clean_env({"PYTHONDONTWRITEBYTECODE": "1"}),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

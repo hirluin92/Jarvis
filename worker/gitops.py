@@ -85,9 +85,17 @@ async def prepare_worktree(local: Path, path: Path, branch: str, base_ref: str) 
         await run(["worktree", "add", str(path), branch], local)
 
 
+# build leftovers that must never end up in a commit, whatever the product's .gitignore says
+JUNK = (
+    ":(glob)**/__pycache__/**", ":(glob)**/*.pyc", ":(glob)**/node_modules/**",
+    ":(glob)**/.pytest_cache/**", ":(glob)**/.venv/**", ":(glob)**/.DS_Store",
+)  # fmt: skip
+
+
 async def changed_files(worktree: Path, base_ref: str) -> list[str]:
     """Everything the build changed, committed or not, compared with the base branch."""
     await run(["add", "-A"], worktree)
+    await run(["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", *JUNK], worktree)
     out = await run(["diff", "--cached", "--name-only", "--no-renames", "-z", base_ref], worktree)
     return [f for f in out.split("\0") if f]
 
