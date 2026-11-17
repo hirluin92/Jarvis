@@ -109,3 +109,38 @@ class Reminder(Base):
     text: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Spec(Base):
+    """A short specification of something to build on a product (phase 10)."""
+
+    __tablename__ = "specs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)  # draft|approved
+    version: Mapped[int] = mapped_column(default=1)
+
+
+class BuildJob(Base):
+    """A build job. The worker process reads these rows; Jarvis only writes them."""
+
+    __tablename__ = "build_jobs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    spec_id: Mapped[int] = mapped_column(ForeignKey("specs.id"), index=True)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    # queued | running | paused_quota | failed | cancelled | pr_opened
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    branch: Mapped[str | None] = mapped_column(String(200))
+    pr_url: Mapped[str | None] = mapped_column(String(300))
+    log_summary: Mapped[str | None] = mapped_column(Text)
+    duration_s: Mapped[int | None] = mapped_column()
+    stop_reason: Mapped[str | None] = mapped_column(String(300))
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    notified_status: Mapped[str | None] = mapped_column(String(16))  # last status told to the user

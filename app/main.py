@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app import builds
 from app.access import access_middleware
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext
@@ -148,12 +149,23 @@ async def lifespan(app: FastAPI):
         return result.answer
 
     reminder_task = asyncio.create_task(reminder_loop(send_report))
+
+    async def build_notifier() -> None:
+        while True:
+            try:
+                await builds.notify_changes(send_report)
+            except Exception:
+                log.exception("build notifier round failed")
+            await asyncio.sleep(10)
+
+    build_task = asyncio.create_task(build_notifier())
     report_task = asyncio.create_task(
         daily_report_loop(produce_report, send_report, s.report_time, ZoneInfo(s.report_timezone))
     )
     yield
     report_task.cancel()
     reminder_task.cancel()
+    build_task.cancel()
     if realtime is not None:
         await realtime.close()
     await bot.updater.stop()

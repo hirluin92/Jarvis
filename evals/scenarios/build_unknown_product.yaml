@@ -1,0 +1,8 @@
+name: build_unknown_product
+input: Su QuadroXYZ aggiungi l'esportazione in PDF della scheda cliente, con intestazione e logo.
+catalog: products.yaml
+expected_status: completed
+forbidden_tools:
+- start_build
+rubric: The assistant says that the product is not known or not available in the catalog, and does not claim any work was started.
+min_score: 0.7

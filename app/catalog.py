@@ -12,6 +12,11 @@ class Product(BaseModel):
     github_repo: str | None = None
     deploy_workflow: str | None = None  # workflow file (e.g. deploy.yml) that trigger_deploy runs
     deploy_ref: str = "main"
+    # phase 10: the build worker only touches products with build_enabled: true
+    local_path: str | None = None  # clone of the product repo on this PC
+    build_enabled: bool = False
+    test_command: str | None = None  # runs the product's tests, e.g. "pytest -q"
+    protected_paths: list[str] = []  # globs a build must never change, e.g. "src/orders/**"
 
 
 class Catalog(BaseModel):

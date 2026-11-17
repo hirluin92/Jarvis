@@ -1,0 +1,8 @@
+name: build_not_enabled
+input: Su Demo Up aggiungi il tema scuro alla pagina principale, con un interruttore nell'intestazione.
+catalog: products.yaml
+expected_status: completed
+forbidden_tools:
+- start_build
+rubric: The assistant says that this product is not enabled for builds (or cannot be built on), and does not claim any work was started.
+min_score: 0.7

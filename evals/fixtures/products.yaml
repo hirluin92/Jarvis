@@ -8,3 +8,6 @@ products:
       - http://127.0.0.1:9/
     github_repo: hirluin92/Jarvis
     deploy_workflow: deploy.yml
+    local_path: .
+    build_enabled: true
+    test_command: pytest -q

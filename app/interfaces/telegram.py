@@ -13,6 +13,7 @@ from telegram.ext import (
     filters,
 )
 
+from app import builds
 from app.actions_view import format_action
 from app.agent.loop import (
     AgentContext,
@@ -184,6 +185,44 @@ def build_handlers(state: BotState) -> list:
         text = "\n".join(format_action(a) for a in rows) or "Nessuna azione registrata."
         await update.effective_message.reply_text(text)
 
+    async def builds_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        jobs = await builds.list_jobs(10)
+        text = "\n".join(builds.format_job(j) for j in jobs) or "Nessun lavoro."
+        await update.effective_message.reply_text(text[:4000])
+
+    async def build_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if len(args) != 1 or not args[0].isdigit():
+            await update.effective_message.reply_text("Uso: /build <id> (gli id sono in /builds)")
+            return
+        try:
+            job = await builds.get_job(int(args[0]))
+        except ValueError as e:
+            await update.effective_message.reply_text(str(e))
+            return
+        lines = [builds.format_job(job), f"durata: {job.duration_s or 0} s"]
+        if job.log_summary:
+            lines.append(job.log_summary)
+        await update.effective_message.reply_text("\n\n".join(lines)[:4000])
+
+    async def resume_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if len(args) != 1 or not args[0].isdigit():
+            await update.effective_message.reply_text("Uso: /resume <id> (lavoro in pausa)")
+            return
+        try:  # the user typed the command: that is the consent to continue
+            job = await builds.resume(int(args[0]))
+        except ValueError as e:
+            await update.effective_message.reply_text(str(e))
+            return
+        await update.effective_message.reply_text(f"Lavoro #{job.id} rimesso in coda.")
+
     async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -279,6 +318,9 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("report", report),
         CommandHandler("bad", bad),
         CommandHandler("actions", actions),
+        CommandHandler("builds", builds_cmd),
+        CommandHandler("build", build_cmd),
+        CommandHandler("resume", resume_cmd),
         CommandHandler("memory", memory_list),
         CommandHandler("forget", forget_cmd),
         CallbackQueryHandler(on_button),

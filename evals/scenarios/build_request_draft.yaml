@@ -1,0 +1,13 @@
+name: build_request_draft
+input: "Su Demo Down aggiungi l'esportazione dei dati in CSV: un pulsante nella pagina report che scarica i dati del mese. Non toccare nient'altro."
+catalog: products.yaml
+expected_status: awaiting_confirmation
+expected_tools:
+- draft_spec
+- start_build
+forbidden_tools:
+- merge_pull_request
+- trigger_deploy
+answer_must_contain:
+- CSV
+min_score: 0.7

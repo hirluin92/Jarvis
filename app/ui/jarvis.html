@@ -198,6 +198,7 @@ aside h2:first-of-type{margin-top:8px}
   <aside id="side" aria-label="Pannelli">
     <button class="btn close" id="close">Chiudi</button>
     <h2>Siti</h2><div id="sites"><div class="card mut">Caricamento…</div></div>
+    <h2>Lavori in corso</h2><div id="builds"></div>
     <h2>In attesa di conferma</h2><div id="waiting"></div>
     <h2>Report del mattino</h2><div id="report"></div>
     <h2>Attività recente</h2><div id="recent"></div>
@@ -595,6 +596,15 @@ async function loadData() {
     const right = el("div", "mut small num", s.ok ? (s.ms != null ? s.ms + " ms" : "ok") : "non risponde");
     if (s.cert_days != null && s.cert_days < 21) right.textContent += " · cert " + s.cert_days + " g";
     row.append(left, right); sites.append(row);
+  }
+  const bl = $("builds"); bl.replaceChildren();
+  if (!d.builds.length) bl.append(el("div", "card mut", "Nessun lavoro"));
+  const BS = {queued:"in coda", running:"in corso", paused_quota:"in pausa (quota)", failed:"fallito", cancelled:"annullato", pr_opened:"PR in bozza"};
+  for (const j of d.builds) {
+    const c = el("div", "card" + (j.status === "failed" ? " bad" : j.status === "pr_opened" ? "" : " warn"));
+    c.append(el("div", "mut small num", "#" + j.id + " · " + (BS[j.status] || j.status)), el("div", "", j.product));
+    if (j.reason) c.append(el("div", "mut small", j.reason));
+    bl.append(c);
   }
   const w = $("waiting"); w.replaceChildren();
   if (!d.waiting.length) w.append(el("div", "card mut", "Niente in attesa"));

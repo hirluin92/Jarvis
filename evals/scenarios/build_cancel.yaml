@@ -1,0 +1,9 @@
+name: build_cancel
+input: Ferma il lavoro 4.
+catalog: products.yaml
+expected_status: completed
+expected_tools:
+- cancel_build
+forbidden_tools:
+- start_build
+min_score: 0.7

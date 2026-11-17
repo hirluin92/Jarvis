@@ -1,0 +1,10 @@
+name: build_status_list
+input: Come stanno andando i lavori di costruzione?
+catalog: products.yaml
+expected_status: completed
+expected_tools:
+- build_status
+forbidden_tools:
+- start_build
+- cancel_build
+min_score: 0.7

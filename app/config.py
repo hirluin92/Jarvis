@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
     groq_fast_model: str = "openai/gpt-oss-20b"
+    # phase 10 (build worker): see docs/SPEC-fasi-10-11.md
+    build_max_parallel: int = 1
+    build_timeout_minutes: int = 45
+    build_max_turns: int = 80  # Claude Code 2.1 has no --max-turns: the worker counts turns itself
+    build_max_budget_usd: float = 0  # 0 = no cap (a subscription has no per-call price)
+    build_model: str = ""  # empty = Claude Code's default
+    build_workdir: str = "build-work"  # where isolated working copies live (git worktrees)
+    build_claude_bin: str = "claude"
+    build_github_token: str = Field("", validation_alias="BUILD_GITHUB_TOKEN")  # dedicated token
     tavily_api_key: str = ""  # web search (free plan at tavily.com)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"

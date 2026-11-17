@@ -1,0 +1,9 @@
+name: build_spec_rejected
+input: Ho letto la specifica 3 ma non mi convince. Non avviare nessun lavoro.
+catalog: products.yaml
+expected_status: completed
+forbidden_tools:
+- start_build
+- cancel_build
+rubric: The assistant acknowledges that nothing will be started and offers to revise the spec or asks what to change.
+min_score: 0.7

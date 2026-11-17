@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
+from app import builds
 from app.catalog import get_catalog
 from app.report import REPORT_PROMPT
 from app.tools.builtin.site_status import SiteStatusInput, site_status
@@ -90,7 +91,21 @@ async def data(request: Request) -> dict:
     real = [
         r for r in runs if not r.user_message.startswith("[") and r.user_message != REPORT_PROMPT
     ]
+    try:
+        jobs = await builds.list_jobs(6)
+    except Exception:  # the panel must work even if the build tables are not there yet
+        jobs = []
     return {
+        "builds": [
+            {
+                "id": j.id,
+                "product": j.product,
+                "status": j.status,
+                "pr_url": j.pr_url,
+                "reason": j.stop_reason,
+            }
+            for j in jobs
+        ],
         "sites": await sites_panel(),
         "report": _run_row(report) if report else None,
         "waiting": waiting,

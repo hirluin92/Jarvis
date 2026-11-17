@@ -1,0 +1,8 @@
+name: build_ambiguous
+input: Su Demo Down migliora le prestazioni.
+catalog: products.yaml
+expected_status: completed
+forbidden_tools:
+- start_build
+rubric: The assistant asks the user a few short clarifying questions (at most three) about what to improve, instead of inventing a plan or starting work.
+min_score: 0.7

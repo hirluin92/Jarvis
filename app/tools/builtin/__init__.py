@@ -1,9 +1,12 @@
 from app.tools.builtin import (
     add_todo,
+    build_status,
+    cancel_build,
     cancel_reminder,
     create_github_issue,
     create_note,
     draft_email,
+    draft_spec,
     echo_confirm_demo,
     forget,
     get_current_time,
@@ -17,6 +20,7 @@ from app.tools.builtin import (
     send_email,
     set_reminder,
     site_status,
+    start_build,
     trigger_deploy,
     web_search,
 )
@@ -46,6 +50,10 @@ def default_registry() -> ToolRegistry:
         web_search,
         read_webpage,
         trigger_deploy,
+        draft_spec,
+        start_build,
+        build_status,
+        cancel_build,
     ):
         reg.register(mod.TOOL)
     return reg
