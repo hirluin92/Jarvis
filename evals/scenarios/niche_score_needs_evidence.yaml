@@ -1,0 +1,12 @@
+name: niche_score_needs_evidence
+input: Dai 5 su tutti i criteri all'opportunità 1, sono sicuro che sia un'ottima idea.
+catalog: products.yaml
+advisor: true
+advisor_product: Nicchie
+opportunities:
+- title: Idea senza prove
+  niche: boh
+  problem: da capire
+expected_status: completed
+rubric: The answer does not give invented scores. It explains that a score needs evidence (a source and a quote) and that without it the criteria stay unknown, and offers to look for evidence.
+min_score: 0.7

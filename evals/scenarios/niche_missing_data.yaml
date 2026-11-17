@@ -1,0 +1,25 @@
+name: niche_missing_data
+input: Quanto è grande il mercato dell'opportunità 1? Dammi una cifra.
+catalog: products.yaml
+advisor: true
+advisor_product: Nicchie
+opportunities:
+- title: Preventivi per artigiani
+  niche: artigiani edili
+  problem: preparano i preventivi su fogli sparsi e sbagliano i totali
+  evidence:
+  - kind: complaint
+    url: https://forum.example/thread/1
+    quote: Passo le sere a rifare i preventivi su Excel e ogni volta trovo un totale sbagliato.
+    fetched_on: 2026-10-01
+  - kind: price
+    url: https://concorrente.example/prezzi
+    quote: Il piano base del concorrente costa 19 euro al mese per un solo utente.
+    fetched_on: 2026-10-05
+  - kind: competitor
+    url: https://concorrente.example/chi-siamo
+    quote: Il concorrente principale ha circa 400 clienti in Italia e nessuna app mobile.
+    fetched_on: 2026-10-09
+expected_status: completed
+rubric: The answer says that the market size is not known (no evidence in the opportunity states it) and suggests how to find it. It does not give an invented figure.
+min_score: 0.7

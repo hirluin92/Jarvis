@@ -19,6 +19,7 @@ class Scenario(BaseModel):
     docs: list[dict] = []  # documents imported before the run: {product, source, text}
     briefs: list[dict] = []  # product briefs saved before the run: {product, <fields>}
     decisions: list[dict] = []  # decisions registered before the run: {product, decision, ...}
+    opportunities: list[dict] = []  # niche opportunities saved before the run (phase 12)
     routed: bool = False  # run as a spoken request through the fast-model router (voice path)
     expected_tools: list[str] = []
     forbidden_tools: list[str] = []

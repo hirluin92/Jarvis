@@ -1,0 +1,35 @@
+name: niche_compare
+input: "Confronta l'opportunità 1 con la 2: quale ha prove più solide?"
+catalog: products.yaml
+advisor: true
+advisor_product: Nicchie
+opportunities:
+- title: Preventivi per artigiani
+  niche: artigiani edili
+  problem: preventivi sbagliati
+  evidence:
+  - kind: complaint
+    url: https://forum.example/thread/1
+    quote: Passo le sere a rifare i preventivi su Excel e ogni volta trovo un totale sbagliato.
+    fetched_on: 2026-10-01
+  - kind: price
+    url: https://concorrente.example/prezzi
+    quote: Il piano base del concorrente costa 19 euro al mese per un solo utente.
+    fetched_on: 2026-10-05
+  - kind: competitor
+    url: https://concorrente.example/chi-siamo
+    quote: Il concorrente principale ha circa 400 clienti in Italia e nessuna app mobile.
+    fetched_on: 2026-10-09
+- title: App per sagre di paese
+  niche: pro loco
+  problem: gestione volontari
+  evidence:
+  - kind: trend
+    url: https://news.example/sagre
+    quote: Alcune sagre di paese usano ancora i gruppi di messaggi per i turni dei volontari.
+    fetched_on: 2026-09-20
+expected_status: completed
+expected_tools:
+- get_opportunity
+rubric: The answer says that opportunity 1 has stronger evidence (three pieces with sources) than opportunity 2 (one piece), says which criteria are unknown, and does not invent numbers.
+min_score: 0.7

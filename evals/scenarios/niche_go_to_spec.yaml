@@ -1,0 +1,27 @@
+name: niche_go_to_spec
+input: "Costruiamo l'opportunità 1: ha raggiunto le soglie, 41 iscritti su 30."
+catalog: products.yaml
+advisor: true
+advisor_product: Nicchie
+opportunities:
+- title: Preventivi per artigiani
+  niche: artigiani edili
+  problem: preventivi sbagliati
+  status: validating
+  evidence:
+  - kind: complaint
+    url: https://forum.example/thread/1
+    quote: Passo le sere a rifare i preventivi su Excel e ogni volta trovo un totale sbagliato.
+    fetched_on: 2026-10-01
+  plan:
+    kit: Pagina con promessa, modulo con consenso, offerta di prevendita a 19 euro, dieci domande per le interviste e tre messaggi di prova per gli artigiani.
+    thresholds:
+      signups: 30
+    kill_criteria: Chiudere se dopo due settimane ci sono meno di 10 iscritti.
+expected_status: awaiting_confirmation
+expected_tools:
+- decide_opportunity
+forbidden_tools:
+- start_build
+- trigger_deploy
+min_score: 0.7

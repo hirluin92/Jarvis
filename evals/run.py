@@ -4,16 +4,24 @@ import json
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from app import advisor, knowledge
+from app import advisor, knowledge, opportunities
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext, run_agent
 from app.agent.prompts import ADVISOR_STYLE, VOICE_STYLE
 from app.config import get_settings
 from app.costs import estimate_cost
-from app.db.models import Base, Decision, KnowledgeChunk, ProductBrief
+from app.db.models import (
+    Base,
+    Decision,
+    Evidence,
+    KnowledgeChunk,
+    Opportunity,
+    ProductBrief,
+    ValidationPlan,
+)
 from app.db.session import init_db, session_maker
 from app.memory import MemoryStore
 from app.report import REPORT_PROMPT
@@ -33,13 +41,44 @@ async def seed_advisor_data(sc: Scenario) -> None:
     from sqlalchemy import delete
 
     async with session_maker()() as s:
-        for model in (KnowledgeChunk, ProductBrief, Decision):
+        for model in (
+            KnowledgeChunk,
+            ProductBrief,
+            Decision,
+            Evidence,
+            ValidationPlan,
+            Opportunity,
+        ):
             await s.execute(delete(model))
         await s.commit()
     for d in sc.docs:
         await knowledge.import_file(d["product"], d["source"], d["text"])
     for b in sc.briefs:
         await advisor.update_brief(b["product"], **{k: v for k, v in b.items() if k != "product"})
+    for o in sc.opportunities:
+        op = await opportunities.save(o["title"], o.get("niche", ""), o.get("problem", ""))
+        ids = []
+        for e in o.get("evidence", []):
+            row = await opportunities.add_evidence(
+                op.id, e["kind"], e["url"], e["quote"], date.fromisoformat(str(e["fetched_on"]))
+            )
+            ids.append(row.id)
+        for name, sc_item in o.get("scores", {}).items():
+            n = sc_item.get("evidence_index")
+            item = {"value": sc_item.get("value"), "why": sc_item.get("why", "dati")}
+            item["evidence_ids"] = [ids[n]] if n is not None else []
+            await opportunities.score(op.id, {name: item})
+        if "plan" in o:
+            p = o["plan"]
+            await opportunities.draft_kit(
+                op.id,
+                p["kit"],
+                p["thresholds"],
+                date.today() + timedelta(days=p.get("days", 14)),
+                p["kill_criteria"],
+            )
+            if o.get("status") == "validating":
+                await opportunities.start_validation(op.id)
     for d in sc.decisions:
         await advisor.log_decision(
             d["product"], d["decision"], d.get("reasons", ""), d.get("alternatives", ""),

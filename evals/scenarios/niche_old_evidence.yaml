@@ -1,0 +1,19 @@
+name: niche_old_evidence
+input: Quanto costa il concorrente dell'opportunità 1 e quanto è affidabile questo dato?
+catalog: products.yaml
+advisor: true
+advisor_product: Nicchie
+opportunities:
+- title: Preventivi per artigiani
+  niche: artigiani edili
+  problem: preparano i preventivi su fogli sparsi
+  evidence:
+  - kind: price
+    url: https://concorrente.example/prezzi
+    quote: Il piano base del concorrente costa 19 euro al mese per un solo utente.
+    fetched_on: 2024-03-01
+expected_status: completed
+expected_tools:
+- get_opportunity
+rubric: The answer gives the price (19 euro per month) with its source and says clearly that the evidence is more than a year old and may be out of date.
+min_score: 0.7

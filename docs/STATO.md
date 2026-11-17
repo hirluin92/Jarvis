@@ -438,3 +438,29 @@ riprova una volta con il doppio dello spazio; (2) dopo `draft_spec` il modello s
 e scheda del prodotto sono messe nel suo contesto dal codice; (4) le eval ora non cadono tutte per un errore su uno scenario.
 Da fare appena il limite di Groq si ripristina: `advisor_recalls_decision`, `advisor_summary_needs_yes`, `advisor_facts_and_opinions`,
 `advisor_idea_to_work`, `advisor_no_trading_advice`, `advisor_challenges_assumption`, e una passata completa sul modello grande.
+
+
+## Fase 12 — Cacciatore di nicchie (17 nov): implementata, verificata a livello di codice
+
+Dettagli d'uso in `docs/NICCHIE.md`. Migrazione 0008 (opportunità, prove, piani di verifica). Le regole contro
+l'invenzione sono nel codice (`app/opportunities.py`): prova = indirizzo vero + citazione; un voto richiede motivo
+e prove di *quella* opportunità, altrimenti resta «sconosciuto» (non zero); il kit richiede soglie, scadenza
+futura e criteri di chiusura; la scheda del radar è costruita dal database. Strumenti in modalità consigliere:
+`save_opportunity`, `add_evidence`, `score_opportunity`, `list_opportunities`, `get_opportunity`,
+`draft_validation_kit`, `start_validation` (conferma), `decide_opportunity` (conferma). Radar settimanale e
+comandi `/radar`, `/nicchie`; pulsanti Approva verifica / Scarta / Più dati.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Il radar propone tre opportunità con almeno tre prove (link e citazione) | PARZIALE: selezione e schede testate (solo opportunità con 3+ prove e punteggio; schede dal database); la ricerca vera con il modello e il web non è stata provata |
+| 2 | Senza prove non c'è un punteggio completo | PASS (test: voto senza prove, con prove di un'altra opportunità, criterio sconosciuto, nessun voto → punteggio nullo) |
+| 3 | Un dato non trovato è «sconosciuto», non inventato | PASS nel codice (criteri sconosciuti elencati; prove inventate rifiutate nel test di scouting); eval `niche_missing_data` e `niche_scouting_no_results` scritte, **non eseguite** |
+| 4 | Il kit contiene soglie e criteri di chiusura prima dell'approvazione | PASS (test: 4 rifiuti, approvazione solo dopo il clic) |
+| 5 | `decide_opportunity` non registra senza il clic | PASS (test) |
+| 6 | «Costruire» crea una bozza di specifica, non un lavoro avviato | PASS (test: una `Spec` in bozza, nessun `BuildJob`) |
+| 7 | Una pagina con istruzioni non cambia il comportamento | PARZIALE: le azioni sensibili richiedono comunque il clic; eval `niche_hostile_page` scritta, **non eseguita** |
+| 8 | Il radar arriva all'orario e rispetta il tetto di spesa | PARZIALE: stesso ciclo settimanale della fase 11 (testato) e stesso modello con tetto (testato); non visto dal vivo |
+| 9 | Almeno 10 scenari di eval | **NON VERIFICATO**: 11 scritti (`niche_*`), non eseguiti (limite giornaliero di Groq) |
+
+Eval in tutto: 83 scenari. Test: 320. Servono da te: un modello capace per risultati migliori e il primo giro di prova
+con `/radar`.
