@@ -425,3 +425,18 @@ async def test_an_advisor_conversation_keeps_its_model_by_voice(tracer):
     await handler.respond("che ne pensi?", TurnClock(), say)
     assert len(advisor_llm.calls) == 1 and everyday.calls == []  # not swapped for the router
     assert said
+
+
+async def test_decisions_and_brief_are_always_in_the_advisors_prompt(tracer, catalog):
+    await advisor.log_decision("QuadroRW", "Non attiviamo Stripe prima di 50 clienti", "costi alti")
+    await advisor.update_brief("QuadroRW", key_numbers="12 clienti, 300 euro al mese")
+    text = await advisor.context_for("QuadroRW")
+    assert "Non attiviamo Stripe prima di 50 clienti" in text and "costi alti" in text
+    assert "12 clienti, 300 euro al mese" in text and "days ago" in text
+
+    async def base(_: str) -> str:
+        return "Fatto salvato: il dentista è Bianchi"
+
+    extra = await advisor.with_advisor_data("QuadroRW", base)("ciao")
+    assert "dentista" in extra and "Stripe" in extra  # the usual extras and the advisor data
+    assert await advisor.context_for("IMS") == ""  # nothing registered: nothing added

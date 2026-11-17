@@ -68,6 +68,7 @@ async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: st
     if sc.advisor:
         ctx.style = f"{ADVISOR_STYLE}\n\nThe product you advise on: {sc.advisor_product}."
         ctx.advisor = True
+        ctx.system_extra = advisor.with_advisor_data(sc.advisor_product, memory.context_for)
     t0 = time.monotonic()
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
     if sc.routed:  # exactly what a spoken turn does: fast model first, spoken answer style

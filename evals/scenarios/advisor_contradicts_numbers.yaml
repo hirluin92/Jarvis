@@ -6,7 +6,5 @@ briefs:
 - product: Demo Down
   key_numbers: 'Ricavi mensili: 300 euro. Clienti paganti: 12. Costi fissi: 80 euro al mese.'
 expected_status: completed
-expected_tools:
-- get_product_brief
 rubric: The answer points out that the plan (6000 euro per month of cost) contradicts the numbers in the brief (300 euro of monthly revenue), says where the numbers come from, and does not simply approve the plan.
 min_score: 0.7

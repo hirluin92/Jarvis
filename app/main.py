@@ -15,7 +15,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app import builds, notify
 from app.access import access_middleware
-from app.advisor import BudgetedLLM, build_advisor_llm
+from app.advisor import BudgetedLLM, build_advisor_llm, with_advisor_data
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext
 from app.agent.prompts import ADVISOR_STYLE
@@ -127,6 +127,7 @@ async def lifespan(app: FastAPI):
         )
         ctx.style = f"{ADVISOR_STYLE}\n\nThe product you advise on: {product}."
         ctx.advisor = True
+        ctx.system_extra = with_advisor_data(product, None)  # decisions and brief, always
         return ctx
 
     http = httpx.AsyncClient(timeout=60)  # shared by the speech providers

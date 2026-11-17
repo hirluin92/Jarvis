@@ -63,8 +63,8 @@ class BotState:
             if key not in self.advisor_contexts:
                 actx = self.make_advisor_context(product)
                 actx.actor = f"telegram:{chat_id}"
-                if self.memory is not None:
-                    actx.system_extra = self.memory.context_for
+                base = self.memory.context_for if self.memory is not None else None
+                actx.system_extra = advisor_mod.with_advisor_data(product, base)
                 if self.conversations is not None:
                     actx.store = self.conversations
                     actx.conversation_id = f"advisor:{chat_id}:{product.lower()}"

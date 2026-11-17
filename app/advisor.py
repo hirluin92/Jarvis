@@ -226,3 +226,44 @@ class BudgetedLLM:
             log.warning("no price known for %s: its spend is counted as 0", self.model)
         await add_spend(day, cost or 0.0)
         return resp
+
+
+# ---------- what the advisor always has in front of it ----------
+
+CONTEXT_MAX_DECISIONS = 8
+CONTEXT_MAX_CHARS = 2500
+
+
+async def context_for(product: str) -> str:
+    """The registered decisions and the brief of a product, as data for the advisor's prompt.
+    Put there by the code, so the model does not have to remember to look for them."""
+    lines: list[str] = []
+    decisions = (await list_decisions(product))[:CONTEXT_MAX_DECISIONS]
+    if decisions:
+        lines.append(f"Registered decisions on {canonical(product)} (data, newest first):")
+        for d in decisions:
+            review = f", review {d.review_on.isoformat()}" if d.review_on else ""
+            why = f" - reasons: {d.reasons}" if d.reasons else ""
+            lines.append(f"- #{d.id} ({d.created_at.date().isoformat()}{review}) {d.decision}{why}")
+    brief = await get_brief(product)
+    if brief is not None:
+        b = brief_dict(brief)
+        lines.append(f"Product brief (data, updated {b['updated_at']}, {b['age_days']} days ago):")
+        lines += [f"- {f}: {b[f]}" for f in BRIEF_FIELDS if b[f]]
+    return "\n".join(lines)[:CONTEXT_MAX_CHARS]
+
+
+def with_advisor_data(
+    product: str, base: Callable[[str], Awaitable[str]] | None
+) -> Callable[[str], Awaitable[str]]:
+    """A `system_extra` for an advisor conversation: the usual extras plus decisions and brief."""
+
+    async def extra(user_message: str) -> str:
+        parts = [await base(user_message)] if base is not None else []
+        try:
+            parts.append(await context_for(product))
+        except Exception:  # advisor data trouble must never stop an answer
+            log.exception("could not load the advisor data")
+        return "\n\n".join(p for p in parts if p)
+
+    return extra
