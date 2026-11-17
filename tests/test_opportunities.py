@@ -381,3 +381,17 @@ def test_the_niche_tools_belong_to_the_advisor_not_to_everyday_chats():
     assert perms["add_evidence"] == perms["score_opportunity"] == "write"
     assert perms["get_opportunity"] == perms["list_opportunities"] == "read"
     assert date.today()  # (keeps the import used)
+
+
+def test_each_advisor_workspace_gets_its_own_smaller_tool_list():
+    import json
+
+    from app.tools.builtin import NICHE_TOOLS, advisor_registry
+
+    niches = {d["name"] for d in advisor_registry("Nicchie").definitions()}
+    product = {d["name"] for d in advisor_registry("Jarvis").definitions()}
+    assert NICHE_TOOLS <= niches and not NICHE_TOOLS & product
+    assert "web_search" in niches and "merge_pull_request" not in niches  # only what it needs
+    assert {"search_docs", "log_decision", "draft_spec"} <= product
+    size = lambda r: len(json.dumps(r.definitions())) // 4  # noqa: E731
+    assert size(advisor_registry("Nicchie")) < 3300 and size(advisor_registry("Jarvis")) < 4500

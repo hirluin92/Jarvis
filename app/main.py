@@ -37,7 +37,7 @@ from app.reminders import reminder_loop
 from app.report import generate_report
 from app.review import move_to_spec, run_review, weekly_review_loop
 from app.scheduler import daily_report_loop
-from app.tools.builtin import ADVISOR_ONLY, default_registry
+from app.tools.builtin import ADVISOR_ONLY, advisor_registry, default_registry
 from app.tracing import Tracer
 from app.ui import router as ui_router
 from app.voice.realtime import RealtimeSessions, VoiceTurnHandler
@@ -119,7 +119,7 @@ async def lifespan(app: FastAPI):
     def make_advisor_context(product: str) -> AgentContext:
         ctx = AgentContext(
             llm=advisor_llm,
-            registry=full_registry,
+            registry=advisor_registry(product),
             tracer=tracer,
             max_iterations=s.agent_max_iterations + 4,
             tool_timeout=s.tool_timeout_seconds,

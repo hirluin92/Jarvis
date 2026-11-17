@@ -114,3 +114,38 @@ ADVISOR_ONLY = frozenset(
 
 def everyday_registry() -> ToolRegistry:
     return default_registry().without(ADVISOR_ONLY)
+
+
+NICHE_TOOLS = frozenset(
+    {
+        "save_opportunity",
+        "add_evidence",
+        "score_opportunity",
+        "list_opportunities",
+        "get_opportunity",
+        "draft_validation_kit",
+        "start_validation",
+        "decide_opportunity",
+    }
+)
+# what a conversation about niches needs: research, niche tools, decisions, a way to reach the user
+NICHE_WORKSPACE_TOOLS = NICHE_TOOLS | {
+    "web_search",
+    "read_webpage",
+    "get_current_time",
+    "log_decision",
+    "list_decisions",
+    "save_session_summary",
+    "send_to_telegram",
+    "set_advisor_mode",
+    "search_docs",
+}
+
+
+def advisor_registry(product: str) -> ToolRegistry:
+    """The tools of an advisor conversation. Two smaller lists instead of one big one: the free
+    model only accepts about 8000 tokens per request, tools included."""
+    full = default_registry()
+    if product.strip().lower() == "nicchie":
+        return full.only(NICHE_WORKSPACE_TOOLS)
+    return full.without(NICHE_TOOLS)

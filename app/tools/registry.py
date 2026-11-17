@@ -32,6 +32,14 @@ class ToolRegistry:
             raise ValueError(f"tool already registered: {tool.name}")
         self._tools[tool.name] = tool
 
+    def only(self, names: frozenset[str] | set[str]) -> "ToolRegistry":
+        """A registry with just these tools."""
+        other = ToolRegistry()
+        for t in self._tools.values():
+            if t.name in names:
+                other.register(t)
+        return other
+
     def without(self, names: frozenset[str] | set[str]) -> "ToolRegistry":
         """A registry with the same tools except `names` (a smaller list is a smaller prompt)."""
         other = ToolRegistry()

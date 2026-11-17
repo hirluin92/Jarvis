@@ -25,7 +25,7 @@ from app.db.models import (
 from app.db.session import init_db, session_maker
 from app.memory import MemoryStore
 from app.report import REPORT_PROMPT
-from app.tools.builtin import default_registry, everyday_registry
+from app.tools.builtin import advisor_registry, everyday_registry
 from app.tracing import Tracer
 from evals.compare import compare, latest_result, save_result
 from evals.fixture_tools import make_eval_registry
@@ -92,7 +92,8 @@ async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: st
     ctx = AgentContext(
         llm=llm,
         registry=make_eval_registry(
-            default_registry() if sc.advisor else everyday_registry(), sc.extra_tools
+            advisor_registry(sc.advisor_product) if sc.advisor else everyday_registry(),
+            sc.extra_tools,
         ),
         tracer=tracer,
         max_iterations=s.agent_max_iterations,
