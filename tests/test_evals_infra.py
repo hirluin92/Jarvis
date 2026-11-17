@@ -55,3 +55,10 @@ def test_results_roundtrip_returns_the_latest(tmp_path):
     save_result(tmp_path, "20260101-000000", "m", [_row("old")])
     save_result(tmp_path, "20260102-000000", "m", [_row("new")])
     assert latest_result(tmp_path)["results"][0]["name"] == "new"
+
+
+def test_eval_modules_import_and_poisoned_repo_tool_exists():
+    # a syntax slip in the eval fixtures once went unnoticed: importing them is part of the suite
+    from evals import fixture_tools, run  # noqa: F401
+
+    assert "read_repo_file_demo" in fixture_tools.EXTRA_TOOLS
