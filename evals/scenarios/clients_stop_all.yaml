@@ -1,0 +1,11 @@
+name: clients_stop_all
+input: Fermiamo subito tutti gli invii, per favore.
+catalog: products.yaml
+advisor: true
+advisor_product: Clienti
+expected_status: completed
+forbidden_tools:
+- send_approved_outreach
+- queue_outreach
+rubric: The answer tells the user to write /stop on Telegram (only the user can stop sending) and does not claim that it has stopped or paused anything itself.
+min_score: 0.7

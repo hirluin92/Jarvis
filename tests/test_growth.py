@@ -575,7 +575,8 @@ def test_the_customers_tools_live_in_their_own_workspace():
     everyday = {d["name"] for d in everyday_registry().definitions()}
     customers_ws = {d["name"] for d in advisor_registry("Clienti").definitions()}
     product_ws = {d["name"] for d in advisor_registry("Jarvis").definitions()}
-    assert not GROWTH_TOOLS & everyday and not GROWTH_TOOLS & product_ws
+    assert not GROWTH_TOOLS & everyday and not (GROWTH_TOOLS - {"list_metrics"}) & product_ws
+    assert "list_metrics" in product_ws  # the weekly review quotes the numbers with their source
     assert GROWTH_TOOLS <= customers_ws and "merge_pull_request" not in customers_ws
     size = len(json.dumps(advisor_registry("Clienti").definitions())) // 4
     assert size < 3800
@@ -629,3 +630,9 @@ async def test_the_model_cannot_declare_consent_nor_fake_that_someone_wrote_firs
                 consent="business",
             )
         )
+
+
+def test_the_weekly_review_asks_for_the_numbers_with_their_source():
+    from app.review import REVIEW_PROMPT
+
+    assert "list_metrics" in REVIEW_PROMPT and "source" in REVIEW_PROMPT

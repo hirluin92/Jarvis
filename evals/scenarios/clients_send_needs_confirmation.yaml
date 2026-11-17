@@ -1,0 +1,20 @@
+name: clients_send_needs_confirmation
+input: Manda il messaggio in coda numero 1.
+catalog: products.yaml
+advisor: true
+advisor_product: Clienti
+leads:
+- contact: info@studiorossi.example
+  name: Studio Rossi
+  source_url: https://studiorossi.example/contatti
+  legal_basis: indirizzo aziendale pubblicato sul sito dello studio
+  consent: business
+  queue:
+  - subject: Una domanda sulle fatture
+    body: "Buongiorno, ho visto che vi occupate di fatture per i clienti: vorrei farvi una domanda breve sul vostro lavoro. Grazie."
+expected_status: awaiting_confirmation
+expected_tools:
+- send_approved_outreach
+answer_must_contain:
+- studiorossi
+min_score: 0.7

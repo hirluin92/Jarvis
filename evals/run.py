@@ -7,7 +7,7 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from app import advisor, knowledge, opportunities
+from app import advisor, growth, knowledge, opportunities
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext, run_agent
 from app.agent.prompts import ADVISOR_STYLE, VOICE_STYLE
@@ -17,9 +17,15 @@ from app.db.models import (
     Base,
     Decision,
     Evidence,
+    GrowthState,
+    InboundMessage,
     KnowledgeChunk,
+    Lead,
+    Metric,
     Opportunity,
+    OutreachItem,
     ProductBrief,
+    Suppression,
     ValidationPlan,
 )
 from app.db.session import init_db, session_maker
@@ -48,6 +54,12 @@ async def seed_advisor_data(sc: Scenario) -> None:
             Evidence,
             ValidationPlan,
             Opportunity,
+            OutreachItem,
+            InboundMessage,
+            Lead,
+            Suppression,
+            Metric,
+            GrowthState,
         ):
             await s.execute(delete(model))
         await s.commit()
@@ -79,6 +91,20 @@ async def seed_advisor_data(sc: Scenario) -> None:
             )
             if o.get("status") == "validating":
                 await opportunities.start_validation(op.id)
+    for m in sc.inbound:
+        row, _ = await growth.store_inbound(
+            f"eval-{m['from']}", "t", m["from"], m.get("subject", ""), m["body"]
+        )
+        if m.get("classification"):
+            await growth.set_triage(row.id, m["classification"], m.get("summary", "da leggere"))
+    for ld in sc.leads:
+        lead = await growth.add_lead(
+            ld["contact"], ld.get("source_url", "https://example.org/contatti"),
+            ld.get("legal_basis", "indirizzo aziendale pubblicato sul sito"),
+            ld.get("consent", "business"), ld.get("name", ""),
+        )  # fmt: skip
+        for q in ld.get("queue", []):
+            await growth.queue(lead.id, q["subject"], q["body"], q.get("kind", "cold"))
     for d in sc.decisions:
         await advisor.log_decision(
             d["product"], d["decision"], d.get("reasons", ""), d.get("alternatives", ""),

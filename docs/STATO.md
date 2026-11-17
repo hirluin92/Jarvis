@@ -464,3 +464,39 @@ comandi `/radar`, `/nicchie`; pulsanti Approva verifica / Scarta / Più dati.
 
 Eval in tutto: 83 scenari. Test: 320. Servono da te: un modello capace per risultati migliori e il primo giro di prova
 con `/radar`.
+
+
+## Fase 13 — Clienti (17 nov): implementata, verificata a livello di codice
+
+Dettagli d'uso in `docs/CLIENTI.md`. Migrazione 0009 (contatti, coda, esclusione, posta ricevuta, numeri, interruttori).
+Le regole sono in `app/growth.py` e valgono prima di ogni invio: fonte e base giuridica obbligatorie, nessun contatto a
+freddo a indirizzi personali, un solo contatto a freddo e al massimo 2 seguiti a 3 giorni, elenco di esclusione, tetto
+giornaliero, orari, `/stop`, livelli 0/1/2, firma + avviso AI + modo per fermarsi in ogni messaggio. **Il modello non ha
+nessuno strumento per cambiare il livello o togliere lo stop, né può dichiarare il consenso** (solo `business` o `inbound`
+verificato dai messaggi ricevuti; l'opt-in lo dichiara solo l'utente con `/iscritto`). La posta si legge solo con
+l'etichetta dedicata; un classificatore senza strumenti tratta il testo come dato ostile; disiscrizioni e rimbalzi sono
+gestiti da regole prima del modello.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Risposta alla casella dedicata → Telegram, classificata, riassunta, con risposta proposta | PASS nei test (Gmail simulato, modello finto); **non provato con la casella vera** (serve il permesso di lettura e l'etichetta) |
+| 2 | Si legge solo la casella o l'etichetta dedicata | PASS (test: un messaggio senza etichetta viene scartato; etichetta mancante o permesso mancante danno un errore chiaro) |
+| 3 | Disiscrizione → elenco di esclusione, nessun invio successivo | PASS (test: regole, contatto bloccato, coda e nuovo contatto rifiutati) |
+| 4 | `queue_outreach` non invia; senza clic non parte nessuna mail | PASS (test dedicato: `send_approved_outreach` a conferma; pulsanti: `/stop` prevale sul clic) |
+| 5 | Un contatto senza fonte e base giuridica è rifiutato | PASS (test) |
+| 6 | Oltre il tetto giornaliero l'invio si ferma e lo dice | PASS (test) |
+| 7 | Il livello 2 non risponde a freddo e torna a 1 sopra la soglia di reclami | PASS (test) |
+| 8 | `/stop` blocca ogni invio e `/riprendi` lo ripristina | PASS a livello di regole (test); i comandi Telegram non sono stati provati dal vivo |
+| 9 | Una mail con istruzioni ostili non fa partire nulla | PASS nei test (classificatore senza strumenti, nulla in coda); eval `clients_injected_mail` scritta, **non eseguita** |
+| 10 | `forget_lead` cancella il contatto e lo blocca per sempre | PASS (test) |
+| 11 | I numeri della settimana entrano nel riesame con la fonte | PARZIALE: strumento `list_metrics`, `/numero` e prompt del riesame aggiornati (test); non visto dal vivo |
+| 12 | Almeno 12 scenari di eval | **NON VERIFICATO**: 12 scritti (`clients_*`: disiscrizione, reclamo, sconto, contatto a freddo a un privato, stop, autonomia, mail ostile, cancellazione, coda, invio a conferma, numero con fonte, niente raccolta da profili privati), non eseguiti (limite giornaliero di Groq) |
+
+**Deviazioni dalla specifica**: (1) per il livello 2 non ci sono «modelli di testo approvati» ma controlli (nessun link,
+massimo 800 caratteri, tetto, orari, blocco automatico); (2) manca la raccolta delle iscrizioni da un modulo del sito (solo
+`/iscritto` a mano) e la chat sul sito (era facoltativa); (3) la lettura Gmail usa `gmail.readonly`, che copre tutta la casella:
+il limite all'etichetta è nel codice, la casella dedicata è l'opzione più rigida. Servono da te: l'etichetta o la casella dedicata,
+il permesso di lettura (`uv run python -m app.auth_gmail`), `OUTREACH_SENDER_NAME` e il parere di un professionista prima del primo
+contatto a freddo.
+
+Eval in tutto: 95 scenari. Test: 348.

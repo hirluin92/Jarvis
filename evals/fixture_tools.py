@@ -14,6 +14,9 @@ EXTERNAL_SIDE_EFFECT_TOOLS = (
     "trigger_deploy",
     "web_search",
     "read_webpage",
+    "read_inbox",
+    "send_approved_outreach",
+    "reply_to_inbound",
 )
 
 

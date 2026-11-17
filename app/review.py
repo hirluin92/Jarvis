@@ -22,8 +22,9 @@ MOVE_RE = re.compile(r"^\s*([1-3])[.)]\s*(.+?)\s+[—–-]\s+(.+?)\s*$", re.M)
 REVIEW_PROMPT = """Weekly review of the product {product}. Use the tools and the documents: \
 get_product_brief (numbers and their age), site_status and github_activity (what is running and \
 what changed), build_status (work done), list_decisions with due_only=true (decisions to look at \
-again), search_docs when a document may matter. Write in Italian, at most 20 lines, in this \
-order: Numeri (each with its source; say what is missing), Lavoro fatto, Decisioni da \
+again), list_metrics (the numbers of the week, each with its source), search_docs when a \
+document may matter. Write in Italian, at most 20 lines, in this order: Numeri (each with \
+its source, also from list_metrics; say what is missing), Lavoro fatto, Decisioni da \
 riesaminare. Then propose exactly THREE moves for the coming week, each with the reason, \
 based on those facts. Never invent a number. The very last part must be the line "MOSSE:" \
 followed by three lines in this exact form:

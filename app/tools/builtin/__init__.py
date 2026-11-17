@@ -202,4 +202,4 @@ def advisor_registry(product: str) -> ToolRegistry:
         return full.only(NICHE_WORKSPACE_TOOLS)
     if product.strip().lower() == "clienti":
         return full.only(GROWTH_WORKSPACE_TOOLS)
-    return full.without(NICHE_TOOLS | GROWTH_TOOLS)
+    return full.without((NICHE_TOOLS | GROWTH_TOOLS) - {"list_metrics"})  # the review needs it
