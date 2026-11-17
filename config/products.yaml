@@ -5,3 +5,13 @@ products:
     urls:
       - http://127.0.0.1:8000/health
     github_repo: hirluin92/Jarvis
+    # phase 10: Jarvis as the test product of the build worker (docs/CAPOCANTIERE.md)
+    local_path: C:/Users/Administrator.ITWEAKS-PC/Desktop/Progetti/Jarvis
+    build_enabled: true
+    test_command: uv run pytest -q
+    protected_paths:
+      - ".env*"
+      - ".github/**"
+      - app/access.py
+      - worker/**
+      - config/products.yaml

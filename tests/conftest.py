@@ -1,3 +1,10 @@
+import os
+
+# Tests must not depend on a developer's .env (a build worker runs them in a clean copy): the two
+# settings without a default get harmless placeholders, as in CI. Real values are never overridden.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///ci.db")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-placeholder")
+
 import pytest
 
 from app.agent.loop import AgentContext
