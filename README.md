@@ -24,6 +24,12 @@ uv run uvicorn app.main:app --reload   # ascolta solo su 127.0.0.1
 | `AGENT_MAX_ITERATIONS` | default 8 |
 | `TOOL_TIMEOUT_SECONDS` | default 30 |
 
+## Capocantiere
+
+Jarvis può far costruire nuove funzioni a un agente Claude Code, che lavora
+su un ramo dedicato e apre una pull request in bozza per la revisione.
+Dettagli e configurazione in [docs/CAPOCANTIERE.md](docs/CAPOCANTIERE.md).
+
 ## Comandi
 
 - `uv run pytest` — test (nessuna chiamata API reale)
