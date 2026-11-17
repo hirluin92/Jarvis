@@ -31,6 +31,8 @@ from app.interfaces.telegram import (
     switch_advisor,
 )
 from app.memory import MemoryStore
+from app.radar import approve_to_kit, more_data, run_radar
+from app.radar import discard as radar_discard
 from app.reminders import reminder_loop
 from app.report import generate_report
 from app.review import move_to_spec, run_review, weekly_review_loop
@@ -213,6 +215,42 @@ async def lifespan(app: FastAPI):
     async def do_review() -> None:
         await run_review(make_advisor_context, send_review)
 
+    async def send_radar(text: str, ids: list[int]) -> None:
+        keyboard = None
+        if ids:
+            oid = ids[0]
+            keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("Approva verifica", callback_data=f"op:ok:{oid}"),
+                        InlineKeyboardButton("Scarta", callback_data=f"op:no:{oid}"),
+                        InlineKeyboardButton("Più dati", callback_data=f"op:more:{oid}"),
+                    ]
+                ]
+            )
+        for user_id in s.telegram_allowed_user_ids:
+            await bot.bot.send_message(chat_id=user_id, text=text[:4000], reply_markup=keyboard)
+
+    async def do_radar() -> None:
+        await run_radar(make_advisor_context, send_radar)
+
+    async def on_opportunity(kind: str, oid: int) -> str:
+        if kind == "no":
+            await radar_discard(oid)
+            return f"Opportunità #{oid} scartata."
+        if kind == "more":
+            return await more_data(oid, make_advisor_context)
+        result, ctx = await approve_to_kit(oid, make_advisor_context)
+        if result.pending and owner_chat:
+            await send_confirmation(bot.bot, bot_state, owner_chat, result, ctx)
+            return "Ecco il kit di verifica: controllalo e conferma qui sopra."
+        return result.answer or "(nessuna risposta)"
+
+    bot_state.run_radar = do_radar
+    bot_state.on_opportunity = on_opportunity
+    radar_task = asyncio.create_task(
+        weekly_review_loop(do_radar, s.radar_day, s.radar_time, ZoneInfo(s.report_timezone))
+    )
     bot_state.run_review = do_review
     bot_state.on_move = lambda move_id: move_to_spec(move_id, make_advisor_context)
     review_task = asyncio.create_task(
@@ -236,6 +274,7 @@ async def lifespan(app: FastAPI):
     reminder_task.cancel()
     build_task.cancel()
     review_task.cancel()
+    radar_task.cancel()
     if realtime is not None:
         await realtime.close()
     await bot.updater.stop()

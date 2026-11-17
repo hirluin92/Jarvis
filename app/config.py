@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     advisor_daily_budget: float = 0  # USD per day, 0 = no cap; reaching it stops the advisor
     review_day: str = "mon"  # mon..sun
     review_time: time = time(8, 0)
+    # phase 12 (niche radar)
+    radar_day: str = "mon"
+    radar_time: time = time(9, 0)
+    radar_topics: str = ""  # comma separated sectors to explore; empty = open-ended
+    score_weights: str = ""  # JSON overriding the weights of the score criteria
     tavily_api_key: str = ""  # web search (free plan at tavily.com)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"

@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 from app import advisor as advisor_mod
-from app import builds
+from app import builds, opportunities
 from app.actions_view import format_action
 from app.agent.loop import (
     AgentContext,
@@ -54,6 +54,8 @@ class BotState:
     advisor_contexts: dict[tuple[int, str], AgentContext] = field(default_factory=dict)
     pending_ctx: dict[int, AgentContext] = field(default_factory=dict)  # who made a pending action
     run_review: Any = None  # () -> None: produce and send the weekly review now
+    run_radar: Any = None  # () -> None: scout niches and send the best now
+    on_opportunity: Any = None  # (action, id) -> str: radar buttons (ok / no / more)
     on_move: Any = None  # (move_id) -> str: turn a review move into a draft spec
 
     async def ctx(self, chat_id: int) -> AgentContext:
@@ -126,11 +128,13 @@ async def switch_advisor(state: BotState, chat_id: int, product: str | None) -> 
     )
 
 
-async def send_confirmation(bot, state: BotState, chat_id: int, result: AgentResult) -> None:
+async def send_confirmation(
+    bot, state: BotState, chat_id: int, result: AgentResult, ctx: AgentContext | None = None
+) -> None:
     """Show a pending confirmation in the Telegram chat, with its buttons. Used when the request
     came from somewhere without buttons (the voice page): only a click here can approve it."""
     state.pending[chat_id] = result
-    state.pending_ctx[chat_id] = await state.ctx(chat_id)
+    state.pending_ctx[chat_id] = ctx or await state.ctx(chat_id)
     state.last_run[chat_id] = result.run_id
     await bot.send_message(
         chat_id=chat_id, text=result.answer, reply_markup=_confirmation_keyboard(result)
@@ -299,6 +303,24 @@ def build_handlers(state: BotState) -> list:
         await update.effective_message.reply_text("Preparo il riesame, ci vuole qualche minuto…")
         await state.run_review()
 
+    async def radar_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.run_radar is None:
+            return
+        await update.effective_message.reply_text("Cerco nicchie, ci vuole qualche minuto…")
+        await state.run_radar()
+
+    async def niches_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        rows = await opportunities.list_all(limit=15)
+        lines = []
+        for op in rows:
+            value, _cov, _unk = opportunities.total(op)
+            lines.append(
+                f"#{op.id} {op.title} · {op.status} · {'n/d' if value is None else int(value)}"
+            )
+        await update.effective_message.reply_text("\n".join(lines) or "Nessuna opportunità.")
+
     async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -373,6 +395,20 @@ def build_handlers(state: BotState) -> list:
         await q.answer()
         cid = update.effective_chat.id
         action, _, run_id = (q.data or "").partition(":")
+        if action == "op":  # the radar: "op:ok:3", "op:no:3", "op:more:3"
+            kind, _, oid = run_id.partition(":")
+            if state.on_opportunity is None or not oid.isdigit():
+                await q.edit_message_text("Opportunità non disponibile.")
+                return
+            await q.edit_message_text(
+                {
+                    "ok": "Preparo il kit di verifica…",
+                    "no": "Scartata.",
+                    "more": "Cerco altre prove…",
+                }.get(kind, "…")
+            )
+            await q.message.reply_text(await state.on_opportunity(kind, int(oid)))
+            return
         if action == "mv":  # a move of the weekly review becomes a draft spec
             if state.on_move is None or not run_id.isdigit():
                 await q.edit_message_text("Mossa non disponibile.")
@@ -411,6 +447,8 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("esci", esci_cmd),
         CommandHandler("fine", fine_cmd),
         CommandHandler("riesame", review_cmd),
+        CommandHandler("radar", radar_cmd),
+        CommandHandler("nicchie", niches_cmd),
         CommandHandler("memory", memory_list),
         CommandHandler("forget", forget_cmd),
         CallbackQueryHandler(on_button),

@@ -214,3 +214,47 @@ class ReviewMove(Base):
     title: Mapped[str] = mapped_column(String(300))
     reason: Mapped[str] = mapped_column(Text, default="")
     spec_id: Mapped[int | None] = mapped_column()  # set once the move became a draft spec
+
+
+class Opportunity(Base):
+    """A niche or product idea under study, with a score built only from evidence (phase 12)."""
+
+    __tablename__ = "opportunities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    title: Mapped[str] = mapped_column(String(160))
+    niche: Mapped[str] = mapped_column(String(200), default="")
+    problem: Mapped[str] = mapped_column(Text, default="")
+    # idea|scouted|shortlisted|validating|go|no_go|building|launched|killed
+    status: Mapped[str] = mapped_column(String(16), default="idea", index=True)
+    product: Mapped[str | None] = mapped_column(String(80))  # catalog name once it exists
+    score_detail: Mapped[dict | None] = mapped_column(JSON)  # criterion -> value, why, evidence ids
+    decision_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class Evidence(Base):
+    """One piece of evidence: where it was read, what it says, when."""
+
+    __tablename__ = "evidence"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    opportunity_id: Mapped[int] = mapped_column(ForeignKey("opportunities.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # complaint|competitor|price|trend|other
+    url: Mapped[str] = mapped_column(String(500))
+    quote: Mapped[str] = mapped_column(Text)
+    fetched_on: Mapped[date] = mapped_column(Date)
+
+
+class ValidationPlan(Base):
+    """How an opportunity will be tested: thresholds and closing criteria come BEFORE the test."""
+
+    __tablename__ = "validation_plans"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    opportunity_id: Mapped[int] = mapped_column(ForeignKey("opportunities.id"), unique=True)
+    kit: Mapped[str] = mapped_column(Text)
+    thresholds: Mapped[dict] = mapped_column(JSON)  # signups, positive_replies, presales
+    deadline: Mapped[date] = mapped_column(Date)
+    kill_criteria: Mapped[str] = mapped_column(Text)
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)

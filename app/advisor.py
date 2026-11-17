@@ -27,7 +27,10 @@ RELATED_MIN_SHARED_WORDS = 2
 
 
 def canonical(product: str) -> str:
-    """The catalog name of a product (case-insensitive); unknown products are an error."""
+    """The catalog name of a product (case-insensitive); unknown products are an error.
+    "Nicchie" is the virtual workspace of the niche radar: it is not a product."""
+    if product.strip().lower() == "nicchie":
+        return "Nicchie"
     (found,) = get_catalog().select(product)
     return found.name
 
@@ -238,6 +241,17 @@ async def context_for(product: str) -> str:
     """The registered decisions and the brief of a product, as data for the advisor's prompt.
     Put there by the code, so the model does not have to remember to look for them."""
     lines: list[str] = []
+    if canonical(product) == "Nicchie":
+        from app import opportunities
+
+        for op in await opportunities.list_all(limit=12):
+            value, coverage, _ = opportunities.total(op)
+            n = len(await opportunities.evidence_of(op.id))
+            score = "n/d" if value is None else f"{value:.0f}/100 (criteri noti {coverage:.0%})"
+            lines.append(f"- #{op.id} {op.title} [{op.status}] score {score}, {n} prove")
+        if not lines:
+            return ""
+        return "\n".join(["Opportunities under study (data):", *lines])[:CONTEXT_MAX_CHARS]
     decisions = (await list_decisions(product))[:CONTEXT_MAX_DECISIONS]
     if decisions:
         lines.append(f"Registered decisions on {canonical(product)} (data, newest first):")
