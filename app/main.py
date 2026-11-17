@@ -11,22 +11,31 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app import builds
+from app import builds, notify
 from app.access import access_middleware
+from app.advisor import BudgetedLLM, build_advisor_llm
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext
+from app.agent.prompts import ADVISOR_STYLE
 from app.config import get_settings
 from app.conversations import ConversationStore
 from app.costs import estimate_cost
 from app.db import session as db
 from app.events import EventBus
-from app.interfaces.telegram import BotState, build_application, send_confirmation
+from app.interfaces.telegram import (
+    BotState,
+    build_application,
+    send_confirmation,
+    switch_advisor,
+)
 from app.memory import MemoryStore
 from app.reminders import reminder_loop
 from app.report import generate_report
+from app.review import move_to_spec, run_review, weekly_review_loop
 from app.scheduler import daily_report_loop
-from app.tools.builtin import default_registry
+from app.tools.builtin import ADVISOR_ONLY, default_registry
 from app.tracing import Tracer
 from app.ui import router as ui_router
 from app.voice.realtime import RealtimeSessions, VoiceTurnHandler
@@ -76,7 +85,8 @@ async def lifespan(app: FastAPI):
     app.state.events = EventBus()
     tracer = Tracer(db.session_maker())
     llm, fast = build_llms(s)
-    registry = default_registry()
+    full_registry = default_registry()
+    registry = full_registry.without(ADVISOR_ONLY)  # everyday chats: a smaller tool list
 
     memory = MemoryStore(db.session_maker())
     conversations = ConversationStore(db.session_maker())
@@ -92,6 +102,32 @@ async def lifespan(app: FastAPI):
             summary_threshold=30,
             keep_recent=12,
         )
+
+    try:
+        advisor_base = build_advisor_llm(s)
+    except Exception as e:  # a missing key must not stop Jarvis: the advisor falls back
+        log.warning("advisor model not available (%s): using the everyday model", e)
+        advisor_base = llm
+
+    async def tell_user(text: str) -> None:  # defined later, resolved when called
+        await send_report(text)
+
+    advisor_llm = BudgetedLLM(advisor_base, s.advisor_daily_budget, tell_user)
+
+    def make_advisor_context(product: str) -> AgentContext:
+        ctx = AgentContext(
+            llm=advisor_llm,
+            registry=full_registry,
+            tracer=tracer,
+            max_iterations=s.agent_max_iterations + 4,
+            tool_timeout=s.tool_timeout_seconds,
+            history_limit=60,
+            summary_threshold=30,
+            keep_recent=12,
+        )
+        ctx.style = f"{ADVISOR_STYLE}\n\nThe product you advise on: {product}."
+        ctx.advisor = True
+        return ctx
 
     http = httpx.AsyncClient(timeout=60)  # shared by the speech providers
     voice: VoiceService | None = None
@@ -110,6 +146,7 @@ async def lifespan(app: FastAPI):
         conversations=conversations,
         memory=memory,
         voice=voice,
+        make_advisor_context=make_advisor_context,
     )
     bot = build_application(s.telegram_bot_token, bot_state)
     await bot.initialize()
@@ -150,6 +187,37 @@ async def lifespan(app: FastAPI):
 
     reminder_task = asyncio.create_task(reminder_loop(send_report))
 
+    owner_chat = next(iter(s.telegram_allowed_user_ids), None)  # the single user's chat
+    notify.sender = send_report if owner_chat else None
+
+    async def advisor_switch(product: str | None) -> str:
+        return await switch_advisor(bot_state, owner_chat, product)
+
+    notify.advisor_switch = advisor_switch if owner_chat else None
+
+    async def send_review(text: str, moves: list) -> None:
+        keyboard = None
+        if moves:
+            keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(f"Mossa {i} → bozza", callback_data=f"mv:{m.id}")
+                        for i, m in enumerate(moves, 1)
+                    ]
+                ]
+            )
+        for user_id in s.telegram_allowed_user_ids:
+            await bot.bot.send_message(chat_id=user_id, text=text, reply_markup=keyboard)
+
+    async def do_review() -> None:
+        await run_review(make_advisor_context, send_review)
+
+    bot_state.run_review = do_review
+    bot_state.on_move = lambda move_id: move_to_spec(move_id, make_advisor_context)
+    review_task = asyncio.create_task(
+        weekly_review_loop(do_review, s.review_day, s.review_time, ZoneInfo(s.report_timezone))
+    )
+
     async def build_notifier() -> None:
         while True:
             try:
@@ -166,6 +234,7 @@ async def lifespan(app: FastAPI):
     report_task.cancel()
     reminder_task.cancel()
     build_task.cancel()
+    review_task.cancel()
     if realtime is not None:
         await realtime.close()
     await bot.updater.stop()

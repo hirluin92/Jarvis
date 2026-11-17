@@ -144,3 +144,73 @@ class BuildJob(Base):
     stop_reason: Mapped[str | None] = mapped_column(String(300))
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     notified_status: Mapped[str | None] = mapped_column(String(16))  # last status told to the user
+
+
+class KnowledgeChunk(Base):
+    """A section of a product document imported from knowledge/<product>/ (phase 11)."""
+
+    __tablename__ = "knowledge_chunks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    source: Mapped[str] = mapped_column(String(300), index=True)  # file name inside the product dir
+    heading: Mapped[str] = mapped_column(String(300), default="")
+    text: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ProductBrief(Base):
+    """One structured summary per product, with the date it was last updated."""
+
+    __tablename__ = "product_briefs"
+    product: Mapped[str] = mapped_column(String(80), primary_key=True)
+    objective: Mapped[str] = mapped_column(Text, default="")
+    customer: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(Text, default="")
+    key_numbers: Mapped[str] = mapped_column(Text, default="")
+    risks: Mapped[str] = mapped_column(Text, default="")
+    next_moves: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class Decision(Base):
+    """A decision with its reasons, the discarded alternatives and a date to look at it again."""
+
+    __tablename__ = "decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    decision: Mapped[str] = mapped_column(Text)
+    reasons: Mapped[str] = mapped_column(Text, default="")
+    alternatives: Mapped[str] = mapped_column(Text, default="")
+    review_on: Mapped[date | None] = mapped_column(Date)
+    contradicts: Mapped[list | None] = mapped_column(JSON)  # ids of decisions this one contradicts
+
+
+class AdvisorSession(Base):
+    """The summary of an advisor session, saved only after the user's yes."""
+
+    __tablename__ = "advisor_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+
+
+class AdvisorSpend(Base):
+    """Estimated spend of the advisor model per day (USD), for the daily budget."""
+
+    __tablename__ = "advisor_spend"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    usd: Mapped[float] = mapped_column(default=0.0)
+
+
+class ReviewMove(Base):
+    """One of the three moves proposed by the weekly review; a button turns it into a spec."""
+
+    __tablename__ = "review_moves"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    product: Mapped[str] = mapped_column(String(80), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    spec_id: Mapped[int | None] = mapped_column()  # set once the move became a draft spec

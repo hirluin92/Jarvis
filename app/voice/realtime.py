@@ -142,7 +142,13 @@ class VoiceTurnHandler:
 
         sentencer = Sentencer(speak, lambda: interrupted)
         task = asyncio.create_task(
-            run_agent(text, ctx, style=VOICE_STYLE, llm=self._llm, on_text=sentencer.feed)
+            run_agent(
+                text,
+                ctx,
+                style=VOICE_STYLE,
+                llm=None if ctx.advisor else self._llm,  # advisor mode keeps its own model
+                on_text=sentencer.feed,
+            )
         )
         try:
             # shielded: an interruption must not cut the agent mid-run (history, tools, trace);

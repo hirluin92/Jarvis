@@ -63,6 +63,8 @@ class AgentContext:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # one run at a time per conversation
     background: set[asyncio.Task] = field(default_factory=set)  # e.g. a summary being written
     summarizing: bool = False
+    style: str = ""  # standing instruction of this conversation (e.g. advisor mode)
+    advisor: bool = False  # an advisor conversation: voice must not swap in the everyday model
 
 
 def _trim(history: list[dict[str, Any]], limit: int) -> None:
@@ -201,6 +203,8 @@ SUMMARY_SYSTEM = (
 async def _system_for(ctx: AgentContext, user_message: str, style: str = "") -> str:
     """The system prompt plus what this run should know: older-conversation summary, saved facts."""
     parts = [SYSTEM_PROMPT]
+    if ctx.style:
+        parts.append(ctx.style)
     if style:
         parts.append(style)
     if ctx.summary:

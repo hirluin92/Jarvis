@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
@@ -13,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+from app import advisor as advisor_mod
 from app import builds
 from app.actions_view import format_action
 from app.agent.loop import (
@@ -46,8 +48,29 @@ class BotState:
     conversations: ConversationStore | None = None  # persistent history (Postgres)
     memory: MemoryStore | None = None  # saved facts; also feeds the context of each run
     voice: VoiceService | None = None  # speech in/out; None = voice messages are ignored
+    # advisor mode (phase 11): a chat can talk to a separate, more capable model about a product
+    make_advisor_context: Any = None  # (product) -> AgentContext
+    advisor: dict[int, str] = field(default_factory=dict)  # chat id -> product being advised on
+    advisor_contexts: dict[tuple[int, str], AgentContext] = field(default_factory=dict)
+    pending_ctx: dict[int, AgentContext] = field(default_factory=dict)  # who made a pending action
+    run_review: Any = None  # () -> None: produce and send the weekly review now
+    on_move: Any = None  # (move_id) -> str: turn a review move into a draft spec
 
     async def ctx(self, chat_id: int) -> AgentContext:
+        product = self.advisor.get(chat_id)
+        if product and self.make_advisor_context is not None:
+            key = (chat_id, product)
+            if key not in self.advisor_contexts:
+                actx = self.make_advisor_context(product)
+                actx.actor = f"telegram:{chat_id}"
+                if self.memory is not None:
+                    actx.system_extra = self.memory.context_for
+                if self.conversations is not None:
+                    actx.store = self.conversations
+                    actx.conversation_id = f"advisor:{chat_id}:{product.lower()}"
+                    actx.history, actx.summary = await self.conversations.load(actx.conversation_id)
+                self.advisor_contexts[key] = actx
+            return self.advisor_contexts[key]
         if chat_id not in self.contexts:
             ctx = self.make_context()
             ctx.actor = f"telegram:{chat_id}"
@@ -85,10 +108,29 @@ def _confirmation_keyboard(result: AgentResult) -> InlineKeyboardMarkup:
     )
 
 
+async def switch_advisor(state: BotState, chat_id: int, product: str | None) -> str:
+    """Enter advisor mode on a product, or leave it (None). Returns what to tell the user."""
+    if product is None:
+        had = state.advisor.pop(chat_id, None)
+        return "Modalità consigliere chiusa." if had else "Non eri in modalità consigliere."
+    if state.make_advisor_context is None:
+        return "La modalità consigliere non è disponibile."
+    try:
+        name = advisor_mod.canonical(product)
+    except ValueError as e:
+        return str(e)
+    state.advisor[chat_id] = name
+    return (
+        f"Modalità consigliere su {name}. Parlami del prodotto; /fine per chiudere con un "
+        "riepilogo, /esci per tornare normale."
+    )
+
+
 async def send_confirmation(bot, state: BotState, chat_id: int, result: AgentResult) -> None:
     """Show a pending confirmation in the Telegram chat, with its buttons. Used when the request
     came from somewhere without buttons (the voice page): only a click here can approve it."""
     state.pending[chat_id] = result
+    state.pending_ctx[chat_id] = await state.ctx(chat_id)
     state.last_run[chat_id] = result.run_id
     await bot.send_message(
         chat_id=chat_id, text=result.answer, reply_markup=_confirmation_keyboard(result)
@@ -223,6 +265,40 @@ def build_handlers(state: BotState) -> list:
             return
         await update.effective_message.reply_text(f"Lavoro #{job.id} rimesso in coda.")
 
+    async def consiglio_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if not args:
+            await update.effective_message.reply_text("Uso: /consiglio <prodotto>")
+            return
+        msg = await switch_advisor(state, update.effective_chat.id, " ".join(args))
+        await update.effective_message.reply_text(msg)
+
+    async def esci_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if _allowed(state, update):
+            msg = await switch_advisor(state, update.effective_chat.id, None)
+            await update.effective_message.reply_text(msg)
+
+    async def fine_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        if update.effective_chat.id not in state.advisor:
+            await update.effective_message.reply_text("Non sei in modalità consigliere.")
+            return
+        await answer(
+            update,
+            "Chiudiamo la sessione. Prepara il riepilogo con le decisioni e le azioni e proponimi "
+            "di salvarlo con save_session_summary.",
+            spoken=False,
+        )
+
+    async def review_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.run_review is None:
+            return
+        await update.effective_message.reply_text("Preparo il riesame, ci vuole qualche minuto…")
+        await state.run_review()
+
     async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -251,12 +327,15 @@ def build_handlers(state: BotState) -> list:
         cid = update.effective_chat.id
         ctx = await state.ctx(cid)
         if old := state.pending.pop(cid, None):
-            cancel_pending(ctx, old)  # keep history valid: unanswered confirm = cancelled
+            owner = state.pending_ctx.pop(cid, None) or ctx
+            cancel_pending(owner, old)  # keep history valid: unanswered confirm = cancelled
         typing = asyncio.create_task(_typing(update))
         try:
             result = await run_agent(text, ctx, style=VOICE_STYLE if spoken else "")
         finally:
             typing.cancel()
+        if result.pending:
+            state.pending_ctx[cid] = ctx
         await _reply(update, state, result)
         # a pending confirmation is shown on screen with its buttons, never settled by voice
         if spoken and state.voice is not None and not result.pending and result.answer:
@@ -294,12 +373,19 @@ def build_handlers(state: BotState) -> list:
         await q.answer()
         cid = update.effective_chat.id
         action, _, run_id = (q.data or "").partition(":")
+        if action == "mv":  # a move of the weekly review becomes a draft spec
+            if state.on_move is None or not run_id.isdigit():
+                await q.edit_message_text("Mossa non disponibile.")
+                return
+            await q.edit_message_text("Scrivo la bozza di specifica…")
+            await q.message.reply_text(await state.on_move(int(run_id)))
+            return
         pending = state.pending.get(cid)
         if pending is None or str(pending.run_id) != run_id:
             await q.edit_message_text("Richiesta scaduta o già usata.")
             return
         state.pending.pop(cid)  # single use: a second click finds nothing
-        ctx = await state.ctx(cid)
+        ctx = state.pending_ctx.pop(cid, None) or await state.ctx(cid)
         if pending.pending is not None and pending.pending.expired():
             cancel_pending(ctx, pending)
             await q.edit_message_text("Richiesta scaduta (oltre 10 minuti): azione non eseguita.")
@@ -321,6 +407,10 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("builds", builds_cmd),
         CommandHandler("build", build_cmd),
         CommandHandler("resume", resume_cmd),
+        CommandHandler("consiglio", consiglio_cmd),
+        CommandHandler("esci", esci_cmd),
+        CommandHandler("fine", fine_cmd),
+        CommandHandler("riesame", review_cmd),
         CommandHandler("memory", memory_list),
         CommandHandler("forget", forget_cmd),
         CallbackQueryHandler(on_button),

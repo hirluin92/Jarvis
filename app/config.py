@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     build_workdir: str = "build-work"  # where isolated working copies live (git worktrees)
     build_claude_bin: str = "claude"
     build_github_token: str = Field("", validation_alias="BUILD_GITHUB_TOKEN")  # dedicated token
+    # phase 11 (advisor): a separate, more capable model for conversations about the products
+    advisor_provider: str = ""  # empty = same provider as LLM_PROVIDER
+    advisor_model: str = ""  # empty = that provider's main model
+    advisor_daily_budget: float = 0  # USD per day, 0 = no cap; reaching it stops the advisor
+    review_day: str = "mon"  # mon..sun
+    review_time: time = time(8, 0)
     tavily_api_key: str = ""  # web search (free plan at tavily.com)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"
