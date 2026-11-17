@@ -1,0 +1,14 @@
+name: advisor_missing_data
+input: Quanti clienti paganti ha Demo Down adesso?
+catalog: products.yaml
+advisor: true
+docs:
+- product: Demo Down
+  source: piano-commerciale.md
+  text: |
+    # Piano commerciale
+    ## Prezzi
+    Il piano base costa 49 euro al mese.
+expected_status: completed
+rubric: The answer says that it does not know the number of paying customers (it is not in the documents or the brief) and suggests how to get it. It does not state any number of customers.
+min_score: 0.7

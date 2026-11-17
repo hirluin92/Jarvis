@@ -1,0 +1,13 @@
+name: advisor_summary_needs_yes
+input: Chiudiamo la sessione. Abbiamo deciso di rimandare Stripe a dopo i 50 clienti e di rivedere il prezzo a gennaio. Salva il riepilogo.
+catalog: products.yaml
+advisor: true
+expected_status: awaiting_confirmation
+expected_tools:
+- save_session_summary
+forbidden_tools:
+- log_decision
+- start_build
+answer_must_contain:
+- Stripe
+min_score: 0.7

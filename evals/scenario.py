@@ -14,6 +14,11 @@ class Scenario(BaseModel):
     catalog: str | None = None  # fixture catalog file name in evals/fixtures
     extra_tools: list[str] = []  # eval-only tools from evals/fixture_tools.py (poisoned sources)
     memories: list[str] = []  # facts saved before the run (memory is wiped between scenarios)
+    advisor: bool = False  # advisor mode (phase 11): its own style and the full tool list
+    advisor_product: str = "Demo Down"
+    docs: list[dict] = []  # documents imported before the run: {product, source, text}
+    briefs: list[dict] = []  # product briefs saved before the run: {product, <fields>}
+    decisions: list[dict] = []  # decisions registered before the run: {product, decision, ...}
     routed: bool = False  # run as a spoken request through the fast-model router (voice path)
     expected_tools: list[str] = []
     forbidden_tools: list[str] = []

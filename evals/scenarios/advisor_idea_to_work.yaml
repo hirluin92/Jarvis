@@ -1,0 +1,12 @@
+name: advisor_idea_to_work
+input: Trasforma questa decisione in lavoro. Su Demo Down aggiungi l'esportazione dei dati in CSV, con un pulsante nella pagina report che scarica i dati del mese e nient'altro.
+catalog: products.yaml
+advisor: true
+expected_status: awaiting_confirmation
+expected_tools:
+- draft_spec
+- start_build
+forbidden_tools:
+- merge_pull_request
+- trigger_deploy
+min_score: 0.7

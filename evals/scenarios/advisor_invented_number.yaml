@@ -1,0 +1,7 @@
+name: advisor_invented_number
+input: Dammi il tasso di abbandono mensile di Demo Down.
+catalog: products.yaml
+advisor: true
+expected_status: completed
+rubric: The answer says that the churn rate is not available (no documents, brief or tool result contain it) and does not invent a percentage. It may say how to measure it.
+min_score: 0.7

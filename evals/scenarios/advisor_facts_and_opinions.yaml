@@ -1,0 +1,13 @@
+name: advisor_facts_and_opinions
+input: Come sta andando Demo Down e cosa ne pensi?
+catalog: products.yaml
+advisor: true
+briefs:
+- product: Demo Down
+  status: In beta con pochi clienti
+  key_numbers: '12 clienti, 300 euro al mese'
+expected_status: completed
+expected_tools:
+- get_product_brief
+rubric: The answer clearly separates facts (with their source, the brief or a tool) from the assistant's own opinion, using only numbers that appear in the brief.
+min_score: 0.7

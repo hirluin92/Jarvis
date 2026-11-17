@@ -57,3 +57,35 @@ async def test_user_text_is_escaped(client, tracer):
 
 async def test_unknown_run_is_404(client):
     assert (await client.get("/ui/runs/999")).status_code == 404
+
+
+async def test_the_product_brief_can_be_read_and_edited_from_the_web(tracer, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import advisor, web
+    from app.catalog import Catalog, Product
+
+    cat = Catalog(products=[Product(name="QuadroRW")])
+    monkeypatch.setattr(advisor, "get_catalog", lambda: cat)
+    monkeypatch.setattr(web, "get_catalog", lambda: cat)
+    app = FastAPI()
+    app.include_router(web.router)
+    app.state.csrf_token = "tok"
+    app.state.tracer = tracer
+    client = TestClient(app)
+
+    assert "QuadroRW" in client.get("/ui/briefs").text
+    page = client.get("/ui/brief/QuadroRW")
+    assert page.status_code == 200 and 'name="key_numbers"' in page.text
+    assert client.post("/ui/brief/QuadroRW", data={"token": "wrong"}).status_code == 403
+    done = client.post(
+        "/ui/brief/QuadroRW",
+        data={"token": "tok", "objective": "Aiutare i commercialisti", "key_numbers": "12 clienti"},
+        follow_redirects=False,
+    )
+    assert done.status_code == 303
+    saved = await advisor.get_brief("QuadroRW")
+    assert saved.objective == "Aiutare i commercialisti" and saved.key_numbers == "12 clienti"
+    assert "12 clienti" in client.get("/ui/brief/QuadroRW").text
+    assert client.get("/ui/brief/Boh").status_code == 404

@@ -1,11 +1,13 @@
 import json
 import secrets
 from html import escape
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app import advisor
+from app.catalog import get_catalog
 from app.costs import estimate_cost, format_cost
 
 router = APIRouter()
@@ -152,3 +154,77 @@ async def run_page(request: Request, run_id: int) -> HTMLResponse:
         "</table></div>"
     )
     return _page(f"Run {run.id}", body)
+
+
+LABELS = {
+    "objective": "Obiettivo",
+    "customer": "Cliente tipo",
+    "status": "Stato",
+    "key_numbers": "Numeri chiave",
+    "risks": "Rischi",
+    "next_moves": "Prossime mosse",
+}
+
+
+@router.get("/ui/briefs", response_class=HTMLResponse)
+async def briefs_page() -> HTMLResponse:
+    rows = ""
+    for p in get_catalog().products:
+        brief = await advisor.get_brief(p.name)
+        when = advisor.brief_dict(brief)["updated_at"] if brief else "—"
+        rows += (
+            f'<tr><td><a href="/ui/brief/{quote(p.name)}">{escape(p.name)}</a></td>'
+            f'<td class="mut">{when}</td></tr>'
+        )
+    body = (
+        "<h1>Schede prodotto</h1><p class='mut'>Riepilogo di ogni prodotto, con la data "
+        f"dell'ultimo aggiornamento.</p><table><tr><th>Prodotto</th><th>Aggiornata</th></tr>"
+        f"{rows}</table>"
+    )
+    return _page("Schede prodotto", body)
+
+
+@router.get("/ui/brief/{product}", response_class=HTMLResponse)
+async def brief_page(request: Request, product: str) -> HTMLResponse:
+    try:
+        name = advisor.canonical(product)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    brief = await advisor.get_brief(name)
+    values = advisor.brief_dict(brief) if brief else {f: "" for f in advisor.BRIEF_FIELDS}
+    fields = "".join(
+        f"<p><label><b>{LABELS[f]}</b><br>"
+        f'<textarea name="{f}" rows="3" cols="80" maxlength="1500">{escape(values[f])}</textarea>'
+        "</label></p>"
+        for f in advisor.BRIEF_FIELDS
+    )
+    updated = values.get("updated_at", "mai")
+    body = (
+        f"<h1>{escape(name)}</h1><p class='mut'>Ultimo aggiornamento: {updated}. "
+        f"<a href='/ui/briefs'>Tutte le schede</a></p>"
+        f'<form method="post" action="/ui/brief/{quote(name)}">'
+        f'<input type="hidden" name="token" value="{request.app.state.csrf_token}">'
+        f"{fields}<button>Salva</button></form>"
+    )
+    return _page(name, body)
+
+
+@router.post("/ui/brief/{product}")
+async def brief_save(request: Request, product: str) -> RedirectResponse:
+    form = await _form(request)
+    try:
+        saved = await advisor.update_brief(
+            product, **{f: form.get(f, "")[:1500] for f in advisor.BRIEF_FIELDS}
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    await request.app.state.tracer.record_action(
+        "web",
+        None,
+        "update_product_brief",
+        "command",
+        {"product": saved.product},
+        {"ok": True},
+        None,
+    )
+    return RedirectResponse(f"/ui/brief/{quote(saved.product)}", status_code=303)

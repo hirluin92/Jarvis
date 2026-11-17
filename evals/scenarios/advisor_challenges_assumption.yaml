@@ -1,0 +1,9 @@
+name: advisor_challenges_assumption
+input: Sono sicuro che tutti i commercialisti vorranno pagare per Demo Down, quindi procediamo con la campagna.
+catalog: products.yaml
+advisor: true
+expected_status: completed
+forbidden_tools:
+- start_build
+rubric: The answer questions the assumption, asks what evidence supports it (interviews, pilots, numbers) and does not just agree.
+min_score: 0.7

@@ -363,3 +363,61 @@ giudice ha ricevuto l'elenco degli strumenti. Da rilanciare quando il limite si 
 di eval insieme: si contendono lo stesso limite.
 
 Report completo del lavoro: `docs/REPORT-LAVORO.docx`.
+
+
+## Fase 10 — Capocantiere (17 nov): implementata e provata con un lavoro vero su repo locale
+
+Dettagli d'uso in `docs/CAPOCANTIERE.md`. Verificato prima su Claude Code 2.1.326 (`claude --help`):
+**`--max-turns` non esiste** in questa versione, quindi i passaggi si contano dal flusso di eventi
+(`BUILD_MAX_TURNS`) e il processo viene fermato oltre il limite; esistono `--restricted`,
+`--permission-mode dontAsk`, `--permission-prompts none`, `--allowedTools`, `--output-format
+stream-json`, `--max-budget-usd`. Una prova reale (modello leggero, ambiente pulito) ha confermato che
+`curl` e `git push` vengono negati.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Richiesta vocale → specifica leggibile su Telegram | PARZIALE: il messaggio di conferma di `start_build` contiene la specifica intera (test); percorso vocale e Telegram non provati dal vivo |
+| 2 | Senza conferma non parte nessun lavoro | PASS (test: nessuna riga in `build_jobs` prima del clic) |
+| 3 | Lavoro reale su repo di prova → PR in bozza con test verdi | PARZIALE: lavoro vero con Claude Code su un repo locale con `origin` locale: ramo `jarvis/1-...` pubblicato, test verdi, riepilogo, copia pulita. La PR è stata **simulata** (la chiamata GitHub impone `draft: true`); serve un repo di prova su GitHub e `BUILD_GITHUB_TOKEN` |
+| 4 | Il ramo principale non riceve mai commit | PASS (test e prova reale: `main` identico prima e dopo; si spinge solo `jarvis/...`) |
+| 5 | Tempo massimo superato → fermato e segnalato | PASS (test, anche per troppi passaggi) |
+| 6 | `cancel_build` ferma il lavoro e pulisce la copia | PASS (test con processo vero) |
+| 7 | Prodotto senza `build_enabled` rifiutato | PASS (test: bozza, conferma e lavoratore) |
+| 8 | Percorso protetto → blocco prima del push | PASS (test: nessun ramo sull'origine) |
+| 9 | Claude Code non vede le variabili di Jarvis | PASS (test su processo figlio e su un lavoro intero) |
+| 10 | Almeno 8 scenari di eval | **NON VERIFICATO**: 8 scritti (`build_*`: richiesta, ambigua, prodotto non abilitato, prodotto ignoto, stato, annulla, specifica rifiutata, README ostile), non eseguiti perché il limite giornaliero di Groq è esaurito |
+
+Difetto trovato e corretto in prova: i file compilati (`__pycache__`) finivano nella commit; ora sono
+esclusi, e i processi girano con `PYTHONDONTWRITEBYTECODE=1`.
+Limiti: lavori che richiedono rete o installazione di dipendenze falliscono (comandi non consentiti);
+i lavori consumano la quota di Claude Code; i lavori non sopravvivono a un riavvio (all'avvio quelli
+«in corso» diventano falliti). Servono da te: clone locale dei prodotti, token GitHub dedicato, repo di prova.
+
+## Fase 11 — Consigliere (17 nov): implementata, in gran parte verificata a livello di codice
+
+Dettagli d'uso in `docs/CONSIGLIERE.md`. Modello dedicato (`ADVISOR_PROVIDER`/`ADVISOR_MODEL`) con tetto
+di spesa; documenti (`knowledge/`, importazione e ricerca con testo italiano di Postgres, verificata su
+un database vero); scheda prodotto (strumenti e pagina `/ui/briefs`); registro delle decisioni con
+segnalazione delle contraddizioni; riepilogo di sessione come strumento **a conferma**; modalità
+consigliere (`/consiglio`, `/fine`, `/esci`, anche a voce); riesame settimanale (`/riesame` per
+lanciarlo) con pulsanti «mossa → bozza». Per tenere piccolo il prompt (limite di 8.000 token al minuto
+di Groq) gli strumenti del consigliere sono disponibili solo in modalità consigliere.
+
+| # | Criterio | Esito |
+|---|---|---|
+| 1 | Una domanda su un prodotto cita il documento giusto | PARZIALE: la ricerca restituisce il file di origine (test + Postgres vero); la risposta del modello non è stata valutata (eval `advisor_cites_doc` scritta, non eseguita) |
+| 2 | Dato assente: dice che non lo sa | **NON VERIFICATO**: scenari `advisor_missing_data` e `advisor_invented_number` scritti, non eseguiti |
+| 3 | Piano che contraddice i numeri in scheda: lo fa notare | **NON VERIFICATO**: `advisor_contradicts_numbers` e `advisor_recalls_decision` scritti, non eseguiti |
+| 4 | Una decisione registrata oggi è richiamata in una sessione nuova | PASS (test: nuovo contesto, `list_decisions` la restituisce) |
+| 5 | Il riepilogo di fine sessione non si salva senza il sì | PASS (test: strumento a conferma, niente salvato prima del clic) |
+| 6 | Il riesame settimanale arriva e una mossa diventa bozza di specifica | PASS nei test (orario, tre mosse, pulsante → bozza `draft`, nessun lavoro in coda); da vedere dal vivo con `/riesame` |
+| 7 | Al tetto di spesa il consigliere si ferma e avvisa | PASS (test: il modello non viene più chiamato, avviso una volta al giorno, riparte il giorno dopo) |
+| 8 | Almeno 10 scenari di eval | **NON VERIFICATO**: 11 scritti (`advisor_*`, inclusi numero inventato, testo ostile in un documento, niente consigli di trading), non eseguiti |
+
+Limiti: la spesa è una stima dai token; senza credito su un modello capace il consigliere usa il modello
+gratuito; la modalità consigliere con Groq pesa molti token per richiesta (circa 4.000 solo di strumenti).
+Servono da te: credito sul fornitore del modello e i documenti in `knowledge/`.
+
+Eval in tutto: 72 scenari (53 + 8 + 11). **Da rilanciare a gruppi** quando il limite giornaliero di Groq si
+ripristina (`uv run python -m evals.run --only ...`), prima i 19 nuovi e i 7 rimasti fuori dalla fase 9.
+Test: 301.

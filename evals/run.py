@@ -7,16 +7,17 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from app import advisor, knowledge
 from app.agent.llm import RoutedLLM, build_llms
 from app.agent.loop import AgentContext, run_agent
-from app.agent.prompts import VOICE_STYLE
+from app.agent.prompts import ADVISOR_STYLE, VOICE_STYLE
 from app.config import get_settings
 from app.costs import estimate_cost
-from app.db.models import Base
+from app.db.models import Base, Decision, KnowledgeChunk, ProductBrief
 from app.db.session import init_db, session_maker
 from app.memory import MemoryStore
 from app.report import REPORT_PROMPT
-from app.tools.builtin import default_registry
+from app.tools.builtin import default_registry, everyday_registry
 from app.tracing import Tracer
 from evals.compare import compare, latest_result, save_result
 from evals.fixture_tools import make_eval_registry
@@ -27,12 +28,33 @@ FIXTURES = Path(__file__).parent / "fixtures"
 RESULTS = Path(__file__).parent / "results"
 
 
+async def seed_advisor_data(sc: Scenario) -> None:
+    """Documents, briefs and decisions of the scenario; the previous scenario's are removed."""
+    from sqlalchemy import delete
+
+    async with session_maker()() as s:
+        for model in (KnowledgeChunk, ProductBrief, Decision):
+            await s.execute(delete(model))
+        await s.commit()
+    for d in sc.docs:
+        await knowledge.import_file(d["product"], d["source"], d["text"])
+    for b in sc.briefs:
+        await advisor.update_brief(b["product"], **{k: v for k, v in b.items() if k != "product"})
+    for d in sc.decisions:
+        await advisor.log_decision(
+            d["product"], d["decision"], d.get("reasons", ""), d.get("alternatives", ""),
+            d.get("review_on"),
+        )  # fmt: skip
+
+
 async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: str) -> dict:
     # a scenario may point at a fixture catalog (e.g. one with a site that is down)
     s.products_file = str(FIXTURES / sc.catalog) if sc.catalog else default_catalog
     ctx = AgentContext(
         llm=llm,
-        registry=make_eval_registry(default_registry(), sc.extra_tools),
+        registry=make_eval_registry(
+            default_registry() if sc.advisor else everyday_registry(), sc.extra_tools
+        ),
         tracer=tracer,
         max_iterations=s.agent_max_iterations,
         tool_timeout=s.tool_timeout_seconds,
@@ -42,6 +64,10 @@ async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: st
     for fact in sc.memories:
         await memory.remember(fact)
     ctx.system_extra = memory.context_for
+    await seed_advisor_data(sc)
+    if sc.advisor:
+        ctx.style = f"{ADVISOR_STYLE}\n\nThe product you advise on: {sc.advisor_product}."
+        ctx.advisor = True
     t0 = time.monotonic()
     question = REPORT_PROMPT if sc.input == "@report" else sc.input
     if sc.routed:  # exactly what a spoken turn does: fast model first, spoken answer style

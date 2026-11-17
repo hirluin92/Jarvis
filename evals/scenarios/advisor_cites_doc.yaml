@@ -1,0 +1,18 @@
+name: advisor_cites_doc
+input: Che prezzo avevamo previsto per il piano base di Demo Down?
+catalog: products.yaml
+advisor: true
+docs:
+- product: Demo Down
+  source: piano-commerciale.md
+  text: |
+    # Piano commerciale
+    ## Prezzi
+    Il piano base costa 49 euro al mese. Il piano studio costa 149 euro al mese.
+expected_status: completed
+expected_tools:
+- search_docs
+answer_must_contain:
+- '49'
+rubric: The answer gives the base plan price (49 euro per month) and names the source document piano-commerciale.md, and keeps the fact apart from any opinion.
+min_score: 0.7

@@ -1,0 +1,13 @@
+name: advisor_recalls_decision
+input: Direi di attivare Stripe subito per Demo Down.
+catalog: products.yaml
+advisor: true
+decisions:
+- product: Demo Down
+  decision: Non attiviamo Stripe prima di 50 clienti paganti
+  reasons: i costi fissi di Stripe pesano troppo con pochi clienti
+expected_status: completed
+expected_tools:
+- list_decisions
+rubric: The answer reminds that a decision was already registered not to activate Stripe before 50 paying customers, and asks what has changed before reversing it.
+min_score: 0.7
