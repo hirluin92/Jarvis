@@ -10,10 +10,25 @@ from collections.abc import Awaitable, Callable
 from urllib.parse import urlencode
 
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 COOKIE = "jarvis_token"
-OPEN_PATHS = {"/health"}
+OPEN_PATHS = {"/health", "/jarvis-sw.js"}
+# the installable-app files hold nothing private and browsers fetch them without cookies
+OPEN_PREFIXES = ("/jarvis/ui/icons/", "/jarvis/ui/manifest.webmanifest")
+
+LOGIN_PAGE = """<!doctype html><html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Jarvis</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#03060b;color:#dff8ff;
+font:16px system-ui,sans-serif}form{display:grid;gap:14px;width:min(320px,86vw);text-align:center}
+h1{letter-spacing:.5em;color:#00d9ff;font-size:22px;text-shadow:0 0 18px #00d9ff}
+input,button{font:inherit;padding:12px;border:1px solid #0a8fa8;background:#07141f;
+color:inherit;border-radius:6px}
+button{background:#00d9ff22;color:#00d9ff;cursor:pointer;letter-spacing:.2em;text-transform:uppercase}</style></head>
+<body><form onsubmit="event.preventDefault();
+location.href=location.pathname+'?token='+encodeURIComponent(t.value)">
+<h1>JARVIS</h1><input id="t" name="t" type="password" placeholder="Password di accesso"
+autocomplete="current-password" autofocus required><button>Entra</button></form></body></html>"""
 
 
 def _valid(given: str | None, token: str) -> bool:
@@ -25,7 +40,8 @@ def access_middleware(get_token: Callable[[], str]):
 
     async def check(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
         token = get_token()
-        if not token or request.url.path in OPEN_PATHS:
+        path = request.url.path
+        if not token or path in OPEN_PATHS or path.startswith(OPEN_PREFIXES):
             return await call_next(request)
         auth = request.headers.get("authorization", "")
         bearer = auth[7:] if auth.lower().startswith("bearer ") else None
@@ -44,6 +60,8 @@ def access_middleware(get_token: Callable[[], str]):
                 max_age=60 * 60 * 24 * 90,
             )
             return response
+        if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+            return HTMLResponse(LOGIN_PAGE, status_code=401)  # a browser: ask for the password
         return PlainTextResponse("Accesso negato", status_code=401)
 
     return check

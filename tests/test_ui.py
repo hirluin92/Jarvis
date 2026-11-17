@@ -95,3 +95,17 @@ def test_3d_orb_files_are_vendored_and_wired_into_the_page():
             assert (ui_dir / rel).is_file(), rel  # no CDN: everything is served by Jarvis
     assert (ui_dir / "vendor" / "three.module.js").is_file()
     assert (ui_dir / "vendor" / "LICENSE-three.txt").is_file()
+
+
+def test_installable_app_files():
+    import json
+    from pathlib import Path
+
+    ui_dir = Path(ui.__file__).parent / "ui"
+    manifest = json.loads((ui_dir / "manifest.webmanifest").read_text(encoding="utf-8"))
+    assert manifest["display"] == "standalone" and manifest["start_url"] == "/jarvis"
+    for icon in manifest["icons"]:
+        assert (ui_dir / icon["src"].removeprefix("/jarvis/ui/")).is_file(), icon["src"]
+    assert (ui_dir / "icons" / "apple-touch-icon.png").is_file()
+    sw = client([]).get("/jarvis-sw.js")
+    assert sw.status_code == 200 and sw.headers["service-worker-allowed"] == "/jarvis"

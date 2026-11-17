@@ -42,3 +42,13 @@ def test_query_token_sets_cookie_then_works_without_it():
     assert "jarvis_token" in r.headers["set-cookie"] and "HttpOnly" in r.headers["set-cookie"]
     assert c.get("/runs?limit=5").status_code == 200  # the client kept the cookie
     assert make("s3cret").get("/runs?token=wrong").status_code == 401
+
+
+def test_browsers_get_a_password_page_and_app_files_stay_open():
+    c = make("s3cret")
+    page = c.get("/runs", headers={"accept": "text/html,application/xhtml+xml"})
+    assert page.status_code == 401 and "Password di accesso" in page.text
+    assert c.get("/runs").text == "Accesso negato"  # API clients get plain text
+    assert c.get("/jarvis-sw.js").status_code != 401
+    assert c.get("/jarvis/ui/icons/icon-192.png").status_code != 401
+    assert c.get("/jarvis/ui/manifest.webmanifest").status_code != 401

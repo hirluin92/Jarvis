@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
 from app.catalog import get_catalog
 from app.report import REPORT_PROMPT
@@ -58,6 +58,22 @@ def _run_row(r) -> dict:
 @router.get("/jarvis", response_class=HTMLResponse)
 async def screen() -> HTMLResponse:
     return HTMLResponse(PAGE.read_text(encoding="utf-8"))
+
+
+SERVICE_WORKER = """// Live data: nothing is cached, the worker only makes the page installable.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener("fetch", () => {});
+"""
+
+
+@router.get("/jarvis-sw.js")
+async def service_worker() -> Response:
+    return Response(
+        SERVICE_WORKER,
+        media_type="text/javascript",
+        headers={"Service-Worker-Allowed": "/jarvis", "Cache-Control": "no-cache"},
+    )
 
 
 @router.get("/jarvis/data")
