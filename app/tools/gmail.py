@@ -64,3 +64,22 @@ def raw_message(mail: MailInput) -> str:
     msg["Subject"] = mail.subject
     msg.set_content(mail.body)
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
+async def send_mail(
+    to: str, subject: str, body: str, thread_id: str | None = None
+) -> dict[str, object]:
+    """Send one message from the user's own mailbox (inside a thread when `thread_id` is given).
+    Gmail must answer that it is SENT: that is the proof."""
+    mail = MailInput(to=to, subject=subject, body=body)
+    payload: dict[str, object] = {"raw": raw_message(mail)}
+    if thread_id:
+        payload["threadId"] = thread_id
+    token = await access_token()
+    async with client(token) as c:
+        sent = await c.post("/messages/send", json=payload)
+        sent.raise_for_status()
+    data = sent.json()
+    if "SENT" not in data.get("labelIds", []):
+        raise RuntimeError("Gmail accepted the message but it is not labelled SENT")
+    return data

@@ -1,7 +1,7 @@
 """One-time Gmail authorization: opens the browser, saves GOOGLE_REFRESH_TOKEN in .env.
 
 Run once with:  uv run python -m app.auth_gmail
-Only the gmail.compose scope is requested (create drafts and send; no reading of the mailbox).
+gmail.compose (drafts, sending) and gmail.readonly (the customers inbox, label-limited in code).
 The refresh token is written to .env and never printed.
 """
 
@@ -20,7 +20,12 @@ from app.config import get_settings
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-SCOPE = "https://www.googleapis.com/auth/gmail.compose"
+# compose: drafts and sending. readonly: reading, needed by the customers inbox (phase 13). Jarvis
+# only ever reads the messages that carry the label INBOX_LABEL: that limit is in the code, because
+# Google has no per-label read scope. A dedicated mailbox is the strictest option.
+SCOPE = (
+    "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly"
+)
 WAIT_SECONDS = 240
 
 

@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     radar_time: time = time(9, 0)
     radar_topics: str = ""  # comma separated sectors to explore; empty = open-ended
     score_weights: str = ""  # JSON overriding the weights of the score criteria
+    # phase 13 (customers): see docs/SPEC-fasi-12-13.md
+    inbox_label: str = "jarvis-clienti"  # Jarvis reads ONLY the messages with this Gmail label
+    outreach_sender_name: str = ""  # who the messages are signed by; empty = sending is refused
+    outreach_daily_cap: int = 20  # cold messages per day
+    reply_daily_cap: int = 10  # autonomous (level 2) replies per day
+    outreach_hours: str = "9-18"  # local hours in which messages may go out
+    outreach_digest_time: time = time(9, 30)
+    growth_monthly_budget: float = 0  # any spend needs a yes and stays under this (USD)
     tavily_api_key: str = ""  # web search (free plan at tavily.com)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"

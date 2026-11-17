@@ -31,6 +31,8 @@ def canonical(product: str) -> str:
     "Nicchie" is the virtual workspace of the niche radar: it is not a product."""
     if product.strip().lower() == "nicchie":
         return "Nicchie"
+    if product.strip().lower() == "clienti":
+        return "Clienti"
     (found,) = get_catalog().select(product)
     return found.name
 
@@ -241,6 +243,10 @@ async def context_for(product: str) -> str:
     """The registered decisions and the brief of a product, as data for the advisor's prompt.
     Put there by the code, so the model does not have to remember to look for them."""
     lines: list[str] = []
+    if canonical(product) == "Clienti":
+        from app import growth
+
+        return await growth.overview()
     if canonical(product) == "Nicchie":
         from app import opportunities
 

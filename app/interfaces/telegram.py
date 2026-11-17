@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 from app import advisor as advisor_mod
-from app import builds, opportunities
+from app import builds, growth, opportunities
 from app.actions_view import format_action
 from app.agent.loop import (
     AgentContext,
@@ -56,6 +56,8 @@ class BotState:
     run_review: Any = None  # () -> None: produce and send the weekly review now
     run_radar: Any = None  # () -> None: scout niches and send the best now
     on_opportunity: Any = None  # (action, id) -> str: radar buttons (ok / no / more)
+    on_customer: Any = None  # (action, kind, id) -> str: approval cards of the customers queue
+    run_digest: Any = None  # () -> int: show today's approval queue now
     on_move: Any = None  # (move_id) -> str: turn a review move into a draft spec
 
     async def ctx(self, chat_id: int) -> AgentContext:
@@ -321,6 +323,93 @@ def build_handlers(state: BotState) -> list:
             )
         await update.effective_message.reply_text("\n".join(lines) or "Nessuna opportunità.")
 
+    async def stop_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if _allowed(state, update):
+            await growth.set_paused(True)
+            await update.effective_message.reply_text(
+                "⛔ Ogni invio è fermo. Per ripartire scrivi /riprendi."
+            )
+
+    async def resume_sending_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if _allowed(state, update):
+            await growth.set_paused(False)
+            await update.effective_message.reply_text("Invii ripristinati (con tutti i controlli).")
+
+    async def level_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if not args:
+            await update.effective_message.reply_text(
+                f"Livello degli invii: {await growth.level()} (0 solo bozze, 1 con il tuo clic, "
+                "2 autonomia limitata alle risposte). Cambia con /livello <0|1|2>"
+            )
+            return
+        try:  # only a person can raise the autonomy: no tool can do it
+            await growth.set_level(int(args[0]))
+        except ValueError as e:
+            await update.effective_message.reply_text(str(e))
+            return
+        await update.effective_message.reply_text(f"Livello degli invii: {args[0]}.")
+
+    async def queue_cmd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update) or state.run_digest is None:
+            return
+        shown = await state.run_digest()
+        if not shown:
+            await update.effective_message.reply_text("Nessun messaggio in attesa di approvazione.")
+
+    async def edit_item_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if len(args) < 2 or not args[0].isdigit():
+            await update.effective_message.reply_text("Uso: /modifica <id> <nuovo testo>")
+            return
+        try:
+            await growth.update_item(int(args[0]), " ".join(args[1:]))
+        except ValueError as e:
+            await update.effective_message.reply_text(str(e))
+            return
+        await update.effective_message.reply_text(
+            f"Testo del messaggio #{args[0]} aggiornato. Usa /coda per rivederlo e approvarlo."
+        )
+
+    async def subscriber_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        if len(args) < 3:
+            await update.effective_message.reply_text(
+                "Uso: /iscritto <email> <fonte> <come ha dato il consenso>, per esempio "
+                "/iscritto mario@gmail.com modulo-sito ha spuntato la casella di consenso"
+            )
+            return
+        try:  # only a person can declare that someone gave consent: the model cannot
+            lead = await growth.add_lead(
+                args[0], args[1] if args[1].startswith("http") else f"https://{args[1]}",
+                " ".join(args[2:]), "optin",
+            )  # fmt: skip
+        except ValueError as e:
+            await update.effective_message.reply_text(str(e))
+            return
+        await update.effective_message.reply_text(f"Contatto #{lead.id} registrato con consenso.")
+
+    async def number_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not _allowed(state, update):
+            return
+        args = getattr(context, "args", None) or []
+        try:
+            name, value, source = args[0], float(args[1].replace(",", ".")), " ".join(args[2:])
+            await growth.record_metric(name, value, source)
+        except (IndexError, ValueError) as e:
+            await update.effective_message.reply_text(
+                "Uso: /numero <voce> <valore> <fonte>, per esempio /numero iscrizioni 12 modulo "
+                f"({e})"
+            )
+            return
+        await update.effective_message.reply_text(f"Salvato: {name} = {value:g} (fonte: {source}).")
+
     async def bad(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not _allowed(state, update):
             return
@@ -395,6 +484,13 @@ def build_handlers(state: BotState) -> list:
         await q.answer()
         cid = update.effective_chat.id
         action, _, run_id = (q.data or "").partition(":")
+        if action in ("ou", "ib"):  # approval cards of the customers queue and received mail
+            kind, _, ident = run_id.partition(":")
+            if state.on_customer is None or not ident.isdigit():
+                await q.edit_message_text("Non disponibile.")
+                return
+            await q.edit_message_text(await state.on_customer(action, kind, int(ident)))
+            return
         if action == "op":  # the radar: "op:ok:3", "op:no:3", "op:more:3"
             kind, _, oid = run_id.partition(":")
             if state.on_opportunity is None or not oid.isdigit():
@@ -448,6 +544,13 @@ def build_handlers(state: BotState) -> list:
         CommandHandler("fine", fine_cmd),
         CommandHandler("riesame", review_cmd),
         CommandHandler("radar", radar_cmd),
+        CommandHandler("stop", stop_cmd),
+        CommandHandler("riprendi", resume_sending_cmd),
+        CommandHandler("livello", level_cmd),
+        CommandHandler("coda", queue_cmd),
+        CommandHandler("modifica", edit_item_cmd),
+        CommandHandler("numero", number_cmd),
+        CommandHandler("iscritto", subscriber_cmd),
         CommandHandler("nicchie", niches_cmd),
         CommandHandler("memory", memory_list),
         CommandHandler("forget", forget_cmd),

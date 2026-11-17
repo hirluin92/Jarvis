@@ -22,8 +22,10 @@ from app.agent.prompts import ADVISOR_STYLE
 from app.config import get_settings
 from app.conversations import ConversationStore
 from app.costs import estimate_cost
+from app.customers import daily_digest, handle_button, poll_inbox
 from app.db import session as db
 from app.events import EventBus
+from app.inbox import InboxError
 from app.interfaces.telegram import (
     BotState,
     build_application,
@@ -246,6 +248,43 @@ async def lifespan(app: FastAPI):
             return "Ecco il kit di verifica: controllalo e conferma qui sopra."
         return result.answer or "(nessuna risposta)"
 
+    async def send_card(text: str, buttons: list[tuple[str, str]]) -> None:
+        keyboard = (
+            InlineKeyboardMarkup([[InlineKeyboardButton(t, callback_data=d) for t, d in buttons]])
+            if buttons
+            else None
+        )
+        for user_id in s.telegram_allowed_user_ids:
+            await bot.bot.send_message(chat_id=user_id, text=text[:4000], reply_markup=keyboard)
+
+    async def show_digest() -> int:
+        return await daily_digest(send_card)
+
+    async def inbox_loop() -> None:
+        while True:
+            await asyncio.sleep(600)
+            try:
+                await poll_inbox(llm, send_card)
+            except InboxError as e:
+                log.warning("inbox not read: %s", e)
+                await asyncio.sleep(3600)  # a missing permission does not fix itself: ask rarely
+            except Exception:
+                log.exception("inbox round failed")
+
+    bot_state.on_customer = handle_button
+    bot_state.run_digest = show_digest
+
+    async def digest_job() -> str:
+        shown = await show_digest()
+        return "" if shown else ""  # the cards are the message: nothing else to send
+
+    async def no_text(text: str) -> None:
+        return None
+
+    digest_task = asyncio.create_task(
+        daily_report_loop(digest_job, no_text, s.outreach_digest_time, ZoneInfo(s.report_timezone))
+    )
+    inbox_task = asyncio.create_task(inbox_loop())
     bot_state.run_radar = do_radar
     bot_state.on_opportunity = on_opportunity
     radar_task = asyncio.create_task(
@@ -275,6 +314,8 @@ async def lifespan(app: FastAPI):
     build_task.cancel()
     review_task.cancel()
     radar_task.cancel()
+    digest_task.cancel()
+    inbox_task.cancel()
     if realtime is not None:
         await realtime.close()
     await bot.updater.stop()

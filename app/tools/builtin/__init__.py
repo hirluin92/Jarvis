@@ -1,5 +1,6 @@
 from app.tools.builtin import (
     add_evidence,
+    add_lead,
     add_todo,
     build_status,
     cancel_build,
@@ -12,23 +13,30 @@ from app.tools.builtin import (
     draft_validation_kit,
     echo_confirm_demo,
     forget,
+    forget_lead,
     get_current_time,
     get_opportunity,
     get_product_brief,
     github_activity,
     http_health_check,
     list_decisions,
+    list_metrics,
     list_opportunities,
     list_reminders,
     log_decision,
     merge_pull_request,
+    queue_outreach,
+    read_inbox,
     read_webpage,
     recall,
+    record_metric,
     remember,
+    reply_to_inbound,
     save_opportunity,
     save_session_summary,
     score_opportunity,
     search_docs,
+    send_approved_outreach,
     send_email,
     send_to_telegram,
     set_advisor_mode,
@@ -36,6 +44,7 @@ from app.tools.builtin import (
     site_status,
     start_build,
     start_validation,
+    triage_message,
     trigger_deploy,
     update_product_brief,
     web_search,
@@ -86,6 +95,15 @@ def default_registry() -> ToolRegistry:
         draft_validation_kit,
         start_validation,
         decide_opportunity,
+        read_inbox,
+        triage_message,
+        add_lead,
+        queue_outreach,
+        send_approved_outreach,
+        reply_to_inbound,
+        record_metric,
+        list_metrics,
+        forget_lead,
     ):
         reg.register(mod.TOOL)
     return reg
@@ -108,6 +126,15 @@ ADVISOR_ONLY = frozenset(
         "draft_validation_kit",
         "start_validation",
         "decide_opportunity",
+        "read_inbox",
+        "triage_message",
+        "add_lead",
+        "queue_outreach",
+        "send_approved_outreach",
+        "reply_to_inbound",
+        "record_metric",
+        "list_metrics",
+        "forget_lead",
     }
 )
 
@@ -142,10 +169,37 @@ NICHE_WORKSPACE_TOOLS = NICHE_TOOLS | {
 }
 
 
+GROWTH_TOOLS = frozenset(
+    {
+        "read_inbox",
+        "triage_message",
+        "add_lead",
+        "queue_outreach",
+        "send_approved_outreach",
+        "reply_to_inbound",
+        "record_metric",
+        "list_metrics",
+        "forget_lead",
+    }
+)
+# customers workspace: the mailbox, the contacts, the queue, the numbers, plus a little research
+GROWTH_WORKSPACE_TOOLS = GROWTH_TOOLS | {
+    "web_search",
+    "read_webpage",
+    "get_current_time",
+    "list_opportunities",
+    "get_opportunity",
+    "send_to_telegram",
+    "set_advisor_mode",
+}
+
+
 def advisor_registry(product: str) -> ToolRegistry:
     """The tools of an advisor conversation. Two smaller lists instead of one big one: the free
     model only accepts about 8000 tokens per request, tools included."""
     full = default_registry()
     if product.strip().lower() == "nicchie":
         return full.only(NICHE_WORKSPACE_TOOLS)
-    return full.without(NICHE_TOOLS)
+    if product.strip().lower() == "clienti":
+        return full.only(GROWTH_WORKSPACE_TOOLS)
+    return full.without(NICHE_TOOLS | GROWTH_TOOLS)

@@ -258,3 +258,85 @@ class ValidationPlan(Base):
     deadline: Mapped[date] = mapped_column(Date)
     kill_criteria: Mapped[str] = mapped_column(Text)
     approved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Lead(Base):
+    """Someone who may want a product: where we found them and the legal basis for contacting."""
+
+    __tablename__ = "leads"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    opportunity_id: Mapped[int | None] = mapped_column(ForeignKey("opportunities.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    contact: Mapped[str] = mapped_column(String(200), index=True)  # email address
+    source_url: Mapped[str] = mapped_column(String(500))
+    legal_basis: Mapped[str] = mapped_column(Text)
+    consent: Mapped[str] = mapped_column(String(16))  # optin | inbound | business
+    status: Mapped[str] = mapped_column(String(16), default="new", index=True)
+    last_contact_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class OutreachItem(Base):
+    """A message waiting for the user's yes (or already sent/skipped/blocked)."""
+
+    __tablename__ = "outreach_queue"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(12))  # cold | followup | reply
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    thread_id: Mapped[str | None] = mapped_column(String(80))  # to answer inside a thread
+    status: Mapped[str] = mapped_column(String(12), default="proposed", index=True)
+    blocked_reason: Mapped[str | None] = mapped_column(String(300))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Suppression(Base):
+    """Addresses that are never contacted again."""
+
+    __tablename__ = "suppression"
+    email: Mapped[str] = mapped_column(String(200), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class InboundMessage(Base):
+    """A message received in the dedicated mailbox label."""
+
+    __tablename__ = "inbound_messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    gmail_id: Mapped[str] = mapped_column(String(64), unique=True)
+    thread_id: Mapped[str] = mapped_column(String(64), default="")
+    from_addr: Mapped[str] = mapped_column(String(200))
+    subject: Mapped[str] = mapped_column(String(300), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    # new | interested | question | objection | unsubscribe | complaint | other
+    classification: Mapped[str] = mapped_column(String(16), default="new", index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    proposed_reply: Mapped[str] = mapped_column(Text, default="")
+    handled: Mapped[bool] = mapped_column(Boolean, default=False)
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"))
+
+
+class Metric(Base):
+    """A number of the week (visits, signups, replies...) with where it comes from."""
+
+    __tablename__ = "metrics"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    opportunity_id: Mapped[int | None] = mapped_column(ForeignKey("opportunities.id"), index=True)
+    week: Mapped[date] = mapped_column(Date, index=True)  # the Monday of that week
+    name: Mapped[str] = mapped_column(String(60))
+    value: Mapped[float] = mapped_column()
+    source: Mapped[str] = mapped_column(String(100))
+
+
+class GrowthState(Base):
+    """Small switches: paused, autonomy level per channel."""
+
+    __tablename__ = "growth_state"
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    value: Mapped[str] = mapped_column(String(200))
