@@ -97,3 +97,4 @@ jarvis/
 - Se la specifica è ambigua o incompleta, chiedi invece di inventare.
 - Non aggiungere funzionalità fuori dalla specifica: proponile a fine lavoro.
 - A fine fase, verifica uno per uno i criteri di accettazione e riporta l'esito.
+- Per riprendere il lavoro: leggi `docs/RIPARTIRE.md` (dove siamo, comandi, cosa fare in ordine) e `docs/STATO.md`.
