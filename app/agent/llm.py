@@ -256,12 +256,20 @@ class OpenAICompatClient:
         return out
 
     async def complete(self, system, messages, tools, on_text: TextSink | None = None):
+        """A model that reasons can spend all its tokens thinking and answer with nothing:
+        in that case ask once more with twice the room (nothing was streamed, so it is safe)."""
+        out = await self._complete_once(system, messages, tools, on_text, 1200)
+        if not out.text.strip() and not out.tool_uses:
+            out = await self._complete_once(system, messages, tools, on_text, 2400)
+        return out
+
+    async def _complete_once(self, system, messages, tools, on_text, max_tokens: int):
         import json
 
         body: dict[str, Any] = {
             "model": self.model,
             "messages": self._messages(system, messages),
-            "max_tokens": 1200,
+            "max_tokens": max_tokens,
         }
         if tools:
             body["tools"] = [

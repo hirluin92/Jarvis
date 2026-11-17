@@ -125,6 +125,13 @@ def _skipped(sc: Scenario) -> dict:
             "cost": 0.0, "skipped": True}  # fmt: skip
 
 
+def _errored(sc: Scenario, error: Exception) -> dict:
+    """A scenario that could not finish: it fails, with the reason, and the run goes on."""
+    why = [f"errore dello strumento di valutazione: {type(error).__name__}: {str(error)[:160]}"]
+    return {"name": sc.name, "ok": False, "score": None, "tools": [], "why": why, "answer": "",
+            "secs": 0, "tokens": 0, "cost": 0.0}  # fmt: skip
+
+
 def print_table(rows: list[dict]) -> None:
     print(f"{'scenario':<26}{'result':<8}{'score':>6}{'secs':>7}{'tokens':>8}{'cost $':>9}  tools")
     for r in rows:
@@ -160,7 +167,10 @@ async def main(max_cost: float | None, only: set[str] | None = None) -> int:
         if max_cost is not None and spent >= max_cost:
             rows.append(_skipped(sc))  # spending cap reached: remaining scenarios count as failed
             continue
-        row = await run_scenario(sc, tracer, llm, s, default_catalog)
+        try:
+            row = await run_scenario(sc, tracer, llm, s, default_catalog)
+        except Exception as e:  # one broken scenario (e.g. a rate limit) must not lose the others
+            row = _errored(sc, e)
         spent += row["cost"]
         rows.append(row)
     print_table(rows)

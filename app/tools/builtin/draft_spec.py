@@ -29,7 +29,8 @@ TOOL = Tool(
     "builds enabled). The text must have these parts: Obiettivo, Incluso, Escluso, Criteri di "
     "accettazione, File probabilmente toccati; at most 3200 characters. If the request is "
     "ambiguous, ask the user at most three questions BEFORE calling this tool. Does not start "
-    "any work: use start_build afterwards.",
+    "any work: ALWAYS call start_build right after, in the same turn, with the spec_id: that "
+    "is what shows the whole spec to the user for approval.",
     SpecInput,
     "write",
     draft_spec,

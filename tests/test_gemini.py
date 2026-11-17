@@ -132,3 +132,29 @@ async def test_openai_compat_streams_text_and_tool_fragments():
     out = await compat(handler).complete("s", [{"role": "user", "content": "x"}], TOOLS, sink)
     assert out.text == "Ciao mondo." and got[-1] == "\n"
     assert out.tool_uses[0].input == {"a": 2}
+
+
+async def test_an_empty_answer_is_asked_again_once_with_more_room():
+    sizes: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sizes.append(json.loads(request.content)["max_tokens"])
+        content = "" if len(sizes) == 1 else "Ecco la risposta."  # reasoning ate the first budget
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    out = await compat(handler).complete("s", [{"role": "user", "content": "x"}], [])
+    assert out.text == "Ecco la risposta." and sizes == [1200, 2400]
+
+
+async def test_a_tool_call_is_not_treated_as_empty():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        call = {"id": "c1", "function": {"name": "t", "arguments": "{}"}}
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": None, "tool_calls": [call]}}]}
+        )
+
+    out = await compat(handler).complete("s", [{"role": "user", "content": "x"}], TOOLS)
+    assert out.tool_uses and len(calls) == 1

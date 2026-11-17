@@ -62,3 +62,11 @@ def test_eval_modules_import_and_poisoned_repo_tool_exists():
     from evals import fixture_tools, run  # noqa: F401
 
     assert "read_repo_file_demo" in fixture_tools.EXTRA_TOOLS
+
+
+async def test_a_scenario_that_blows_up_fails_alone_and_the_run_goes_on(monkeypatch):
+    from evals import run as eval_run
+    from evals.scenario import Scenario
+
+    row = eval_run._errored(Scenario(name="x", input="ciao"), RuntimeError("429 Too Many Requests"))
+    assert row["ok"] is False and "429" in row["why"][0] and row["name"] == "x"
