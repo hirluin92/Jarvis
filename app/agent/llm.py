@@ -261,7 +261,7 @@ class OpenAICompatClient:
         body: dict[str, Any] = {
             "model": self.model,
             "messages": self._messages(system, messages),
-            "max_tokens": 2048,
+            "max_tokens": 1200,
         }
         if tools:
             body["tools"] = [

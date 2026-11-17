@@ -275,7 +275,19 @@ passando a Deepgram nova-3 (`STT_PROVIDER=deepgram`, ora il default) 3 su 3 corr
 risposta veloce secondo l'utente. ElevenLabs resta selezionabile da `.env`.
 Effetto sull'errore di attacco ("Quiore") non garantito: da misurare dal vivo (criteri 2 e 3).
 
-La fase 7 NON è iniziata.
+## Fase 7 — Sempre acceso: parte gratuita fatta (16-17 nov)
+
+Senza un mini PC dedicato è stato fatto tutto ciò che non richiede hardware (dettagli in
+`docs/DEPLOY.md`): immagine Docker dell'app (`docker compose --profile app up -d --build`, con
+riavvio automatico e controllo di salute del database), backup giornaliero di Postgres
+(`scripts/backup.ps1`, attività pianificata `JarvisBackup` alle 03:00, ultimi 14 dump),
+**ripristino provato** in un database di prova con conteggi identici (49 run, 136 step, 1 memoria,
+1 conversazione, 4 azioni), password di accesso a tutte le pagine (`ACCESS_TOKEN`; `/health` libero;
+pagina di accesso per i browser), accesso dal telefono con Tailscale in HTTPS (solo rete privata),
+microfono muto da remoto mentre Jarvis parla (`REMOTE_BARGE_IN`), nuova chiamata che sostituisce
+una sessione vecchia ancora aperta.
+Non fatto: Home Assistant e satellite vocale (servono dispositivi); prova di riavvio del PC
+(criterio 1); il report delle 7:30 e i promemoria arrivano solo con il PC acceso.
 
 ## Modello gratuito (16 nov)
 
@@ -312,3 +324,27 @@ le prestazioni su telefono vere vanno viste dal vivo.
 Quarta rifinitura (17 nov): scie di movimento (AfterimagePass), aberrazione cromatica sulle onde d'urto,
 sequenza di avvio a ogni collegamento (voci di avvio mostrate solo a sessione già stabilita),
 riflesso orizzontale sul nucleo quando qualcuno parla, luminosità ridotta per non saturare.
+(La "nessuna installazione come app" scritta sopra non vale più: la PWA è nella fase 9.)
+
+## Fase 9 — Affidabilità, app installabile, strumenti nuovi (17 nov)
+
+- **Groq più affidabile**: i 5 scenari che fallivano ora passano. Cause: il modello inventava
+  capacità (regola nel prompt: elencare solo ciò che gli strumenti fanno), scambiava `http_health_check`
+  con `site_status` (descrizioni più nette) e il giudice delle eval non vedeva i risultati degli
+  strumenti (ora li riceve come prova). Le eval ora spiegano i fallimenti (`!` sotto la tabella) e si
+  rilanciano a gruppi con `--only`.
+- **PWA**: manifest, icone (anche maskable e apple-touch), service worker che non mette nulla in
+  cache; file pubblici senza cookie; su iPhone l'app installata non condivide il cookie di Safari,
+  quindi i browser senza accesso ricevono una pagina con la password (si chiede una volta).
+  Verificata in Chrome: service worker attivo, nessun errore del manifest.
+- **Promemoria/agenda** (migrazione 0005): `set_reminder` e `cancel_reminder` (`write`),
+  `list_reminders` (`read`); il ciclo di consegna (ogni 15 s) invia su Telegram e segna "inviato"
+  solo dopo l'invio riuscito (altrimenti riprova), mai due volte.
+- **Web**: `web_search` con Tavily (serve `TAVILY_API_KEY`, piano gratuito; senza chiave dice
+  chiaramente che non è configurato) e `read_webpage` che rifiuta indirizzi non pubblici (localhost,
+  reti private, metadati cloud), controllando anche ogni redirect, con limite di 1 MB. DuckDuckGo e
+  Wikipedia rifiutano i client automatici senza identificazione: non si aggira il rifiuto.
+- **`trigger_deploy`** (`confirm`): avvia solo il workflow indicato nel catalogo (`deploy_workflow`,
+  `deploy_ref`) per quel prodotto; la conferma mostra repo, workflow e ramo; senza workflow nel
+  catalogo si rifiuta. Mai eseguito su un sistema reale (nessun prodotto con deploy).
+- 21 test nuovi (259 in tutto) e 5 scenari di eval (53 in tutto).

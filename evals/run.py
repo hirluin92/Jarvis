@@ -66,10 +66,14 @@ async def run_scenario(sc: Scenario, tracer: Tracer, llm, s, default_catalog: st
     tin, tout = run.input_tokens, run.output_tokens
     score = None
     if sc.rubric:
+        tools_line = "Tools the assistant really has: " + ", ".join(sorted(ctx.registry._tools))
         evidence = "\n".join(
-            json.dumps(x.output, ensure_ascii=False, default=str)[:1500]
-            for x in run.steps
-            if x.type == "tool_call"
+            [tools_line]
+            + [
+                json.dumps(x.output, ensure_ascii=False, default=str)[:1500]
+                for x in run.steps
+                if x.type == "tool_call"
+            ]
         )
         v = await judge_answer(llm, tracer, sc.name, sc.input, result.answer, sc.rubric, evidence)
         score = v.score
